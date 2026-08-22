@@ -1,0 +1,30 @@
+# Normalise line endings: LF in the repository and in working copies.
+# Without this, a mixed .NET/Node repo on Windows produces constant
+# "LF will be replaced by CRLF" churn, and shell scripts break once they run
+# inside Linux containers and CI.
+* text=auto eol=lf
+
+# Windows-only tooling that genuinely requires CRLF
+*.sln  text eol=crlf
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
+
+# Must stay LF even on Windows — these execute in containers
+*.sh   text eol=lf
+
+# Binary: never line-ending converted, never diffed as text
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.ico     binary
+*.pdf    binary
+*.zip    binary
+*.gz     binary
+*.woff   binary
+*.woff2  binary
+*.ttf    binary
+*.dll    binary
+*.exe    binary
+*.pcap   binary

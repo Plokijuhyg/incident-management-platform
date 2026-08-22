@@ -1,6 +1,7 @@
 # Architecture
 
-> **Status:** DESIGN — agreed 2026-08-22. Nothing in this document is implemented yet.
+> **Status:** DESIGN — agreed 2026-08-22. Project structure (§3, §6) is scaffolded
+> and building; everything else is still design only.
 > Each section is marked ✅ implemented / 🚧 in progress / 📋 planned as the build proceeds.
 > This file must be updated whenever the real architecture diverges from it.
 
@@ -110,7 +111,7 @@ structure below is already the seam.
 
 ```
 backend/
-├── IncidentPlatform.sln
+├── IncidentPlatform.slnx        ← .NET 10 default: XML solution format, not .sln
 ├── IncidentPlatform.Api/
 │   ├── Controllers/          thin HTTP endpoints
 │   ├── Services/             business logic implementations
@@ -173,7 +174,18 @@ attackers exhaust CPU on token validation.
 
 ## 6. Frontend architecture
 
-Angular 22, standalone components (no `NgModule`), signals for local state.
+Angular 22.1, standalone components (no `NgModule`), signals for local state.
+
+Scaffolding decisions, all deliberate:
+
+| Choice | Value | Reason |
+|---|---|---|
+| SSR / prerendering | **Off** | Every page sits behind a login. There is no SEO benefit, and server-rendering an authenticated dashboard means handling tokens on the server — complexity for nothing |
+| Change detection | **Zoneless** (no `zone.js`) | Angular's current direction, and the whole app is `HttpClient` + signals, which need no zone patching. Smaller bundle, no monkey-patched globals |
+| Stylesheets | Plain CSS | Per the agreed stack. Modern CSS has nesting and custom properties; a preprocessor is not needed |
+| Test runner | Vitest | The CLI's current default, replacing Karma |
+| File naming | **2025 style guide** — `app.ts`, `auth.ts`, not `app.component.ts`, `auth.service.ts` | Angular's current official convention, and what `ng generate` produces by default. Note this differs from most pre-v20 tutorials you will find online; the folder gives the context the suffix used to |
+| TypeScript | 6.0, `strict` | Strict mode on from the start — retrofitting it later means fixing hundreds of errors at once |
 
 ```
 frontend/src/app/
