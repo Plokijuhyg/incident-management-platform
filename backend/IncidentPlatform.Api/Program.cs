@@ -2,6 +2,7 @@ using IncidentPlatform.Api.Middleware;
 using Serilog;
 using Serilog.Formatting.Compact;
 using Microsoft.Extensions.Hosting;
+using IncidentPlatform.Api.Configuration;
 
 // Configured before WebApplication.CreateBuilder so that any startup failure
 // (e.g. a bad connection string, added in Phase 4) is itself captured by
@@ -59,6 +60,15 @@ try
     // GlobalExceptionHandler runs.
     builder.Services.AddProblemDetails();
     builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+        // Strongly-typed, validated configuration. ValidateDataAnnotations()
+    // checks the [Required]/[MinLength] attributes on CorsSettings;
+    // ValidateOnStart() means a bad config fails the app immediately at
+    // startup, not the first time something tries to read the setting.
+    builder.Services
+        .AddOptions<CorsSettings>()
+        .Bind(builder.Configuration.GetSection(CorsSettings.SectionName))
+        .ValidateDataAnnotations()
+        .ValidateOnStart();
 
     var app = builder.Build();
 
