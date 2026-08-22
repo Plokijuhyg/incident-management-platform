@@ -19,3 +19,21 @@ This is an incident management platform — not a SIEM replacement. It models th
 🚧 Under active development — see commit history for progress.
 
 ## Project Structure
+
+```
+incident-management-platform/
+├── backend/      ASP.NET Core Web API (C#, EF Core)
+├── frontend/     Angular SPA (TypeScript)
+├── docs/         architecture, database, API and security design
+├── docker/       container definitions (later phase)
+└── .github/      CI/CD workflows (later phase)
+```
+
+## Documentation
+
+Design is documented before implementation, and kept in sync with it:
+
+- [Architecture](docs/architecture.md) — layering, project layout, middleware pipeline, cross-cutting decisions
+- [Database Design](docs/database-design.md) — ERD, all tables, keys, indexes, and the reasoning behind the model
+- [API Design](docs/api-design.md) — endpoint contracts, pagination/filtering/sorting conventions, error shape
+- [Security](docs/security.md) — authentication, RBAC, OWASP-mapped controls, secure file handling, known gaps
