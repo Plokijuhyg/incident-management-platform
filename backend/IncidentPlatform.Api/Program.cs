@@ -28,12 +28,18 @@ try
     // Replaces the default console logger with Serilog for the whole host.
     // Reads the final configuration from appsettings.json's "Serilog"
     // section, layered on top of the bootstrap logger above.
-    builder.Host.UseSerilog((context, services, configuration) => configuration
+      builder.Host.UseSerilog((context, services, configuration) => configuration
         .ReadFrom.Configuration(context.Configuration)
         .ReadFrom.Services(services)
         .Enrich.FromLogContext()
         .Enrich.WithMachineName()
-        .Enrich.WithThreadId());
+        .Enrich.WithThreadId()
+        .WriteTo.Console()
+        .WriteTo.File(
+            new CompactJsonFormatter(),
+            path: "logs/log-.json",
+            rollingInterval: RollingInterval.Day,
+            retainedFileCountLimit: 14));
 
     // -----------------------------------------------------------------------
     // Services
