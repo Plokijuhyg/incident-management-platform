@@ -5,6 +5,8 @@ using Microsoft.Extensions.Hosting;
 using IncidentPlatform.Api.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using IncidentPlatform.Api.Data;
+using Microsoft.EntityFrameworkCore;
 
 // Configured before WebApplication.CreateBuilder so that any startup failure
 // (e.g. a bad connection string, added in Phase 4) is itself captured by
@@ -27,6 +29,15 @@ try
     Log.Information("Starting IncidentPlatform.Api");
 
     var builder = WebApplication.CreateBuilder(args);
+    // WebApplicationFactory-hosted tests invoke this Main() directly and
+    // don't inherit ASPNETCORE_ENVIRONMENT from launchSettings.json — so the
+    // test host reports "Production", and CreateBuilder's automatic User
+    // Secrets loading (which only triggers in Development) never runs. Added
+    // explicitly here so local dev and the test host both read the same
+    // secrets.json regardless of which environment name the process reports.
+    // optional: true means this is a no-op with no error on a real
+    // deployment, where no secrets.json file exists at all.
+    builder.Configuration.AddUserSecrets<Program>(optional: true);
 
     // Replaces the default console logger with Serilog for the whole host.
     // Reads the final configuration from appsettings.json's "Serilog"
@@ -71,18 +82,35 @@ try
         .Bind(builder.Configuration.GetSection(CorsSettings.SectionName))
         .ValidateDataAnnotations()
         .ValidateOnStart();
+    
+        // MySQL via Pomelo. ServerVersion.AutoDetect connects once at startup to
+    // ask MySQL its own version — this lets EF Core generate SQL that matches
+    // the actual server (8.0.43) rather than guessing, which matters for
+    // features like JSON columns (used by Alerts.RawPayload later) that
+    // differ across MySQL versions.
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+        ?? throw new InvalidOperationException(
+            "Connection string 'DefaultConnection' not found. " +
+            "Run 'dotnet user-secrets set \"ConnectionStrings:DefaultConnection\" \"...\"' in the API project.");
 
-        // CORS policy itself. The allowed origins list is read from CorsSettings
-    // via IOptions at the time this policy is built — Program.cs never reads
-    // configuration strings directly, keeping the single source of truth in
-    // CorsSettings.
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+
+          // CORS policy itself. Bound directly from configuration once, here —
+    // not via BuildServiceProvider() (which would create a second, wasteful
+    // copy of every singleton service just to read one settings object).
+    // The AddOptions<CorsSettings> registration above still provides
+    // ValidateOnStart() fail-fast behavior for the app as a whole; this is
+    // just the one place that needs the value before the container exists.
+    var corsSettings = builder.Configuration
+        .GetSection(CorsSettings.SectionName)
+        .Get<CorsSettings>()
+        ?? throw new InvalidOperationException("Cors configuration section is missing.");
+
     builder.Services.AddCors(corsOptions =>
     {
         corsOptions.AddPolicy("AngularApp", policy =>
         {
-            using var serviceProvider = builder.Services.BuildServiceProvider();
-            var corsSettings = serviceProvider.GetRequiredService<IOptions<CorsSettings>>().Value;
-
             policy
                 .WithOrigins(corsSettings.AllowedOrigins)
                 .AllowAnyHeader()
@@ -90,7 +118,6 @@ try
                 .AllowCredentials();
         });
     });
-
     var app = builder.Build();
 
     // -------------------------------------------------------------------------
