@@ -3,6 +3,8 @@ using Serilog;
 using Serilog.Formatting.Compact;
 using Microsoft.Extensions.Hosting;
 using IncidentPlatform.Api.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 // Configured before WebApplication.CreateBuilder so that any startup failure
 // (e.g. a bad connection string, added in Phase 4) is itself captured by
@@ -70,6 +72,25 @@ try
         .ValidateDataAnnotations()
         .ValidateOnStart();
 
+        // CORS policy itself. The allowed origins list is read from CorsSettings
+    // via IOptions at the time this policy is built — Program.cs never reads
+    // configuration strings directly, keeping the single source of truth in
+    // CorsSettings.
+    builder.Services.AddCors(corsOptions =>
+    {
+        corsOptions.AddPolicy("AngularApp", policy =>
+        {
+            using var serviceProvider = builder.Services.BuildServiceProvider();
+            var corsSettings = serviceProvider.GetRequiredService<IOptions<CorsSettings>>().Value;
+
+            policy
+                .WithOrigins(corsSettings.AllowedOrigins)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials();
+        });
+    });
+
     var app = builder.Build();
 
     // -------------------------------------------------------------------------
@@ -88,6 +109,19 @@ try
     // ms. This is the "what happened" log; GlobalExceptionHandler's own logs
     // are the "what went wrong" detail for the subset of requests that failed.
     app.UseSerilogRequestLogging();
+
+    app.UseExceptionHandler();
+
+    // One structured log line per request: method, path, status code, elapsed
+    // ms. This is the "what happened" log; GlobalExceptionHandler's own logs
+    // are the "what went wrong" detail for the subset of requests that failed.
+    app.UseSerilogRequestLogging();
+
+    // Must run before UseAuthorization() (added in Phase 6) — otherwise a
+    // request rejected for auth reasons never gets CORS headers attached,
+    // and the browser reports a misleading CORS error instead of the real
+    // 401/403.
+    app.UseCors("AngularApp");
 
     if (!app.Environment.IsProduction())
     {
