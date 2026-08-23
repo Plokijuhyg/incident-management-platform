@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using IncidentPlatform.Api.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 // Configured before WebApplication.CreateBuilder so that any startup failure
 // (e.g. a bad connection string, added in Phase 4) is itself captured by
@@ -161,7 +162,17 @@ try
 
     // Anonymous liveness probe. Deliberately returns no dependency detail — a
     // health endpoint that enumerates infrastructure is reconnaissance.
-    app.MapHealthChecks("/health");
+     app.MapHealthChecks("/health");
+
+    // Idempotent reference-data seeding, run once per startup. Scoped
+    // because AppDbContext is registered as scoped (EF Core's default) —
+    // resolving it here at the app root requires creating a scope manually,
+    // since Program.cs runs outside any HTTP request's own scope.
+    using (var scope = app.Services.CreateScope())
+    {
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await DataSeeder.SeedAsync(dbContext);
+    }
 
     app.Run();
 }
