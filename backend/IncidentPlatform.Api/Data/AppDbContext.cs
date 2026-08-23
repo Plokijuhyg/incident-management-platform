@@ -25,6 +25,7 @@ public class AppDbContext : DbContext
     public DbSet<IncidentComment> IncidentComments => Set<IncidentComment>();
     public DbSet<ResponseAction> ResponseActions => Set<ResponseAction>();
     public DbSet<Evidence> Evidence => Set<Evidence>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -46,5 +47,6 @@ public class AppDbContext : DbContext
         modelBuilder.ApplyConfiguration(new IncidentCommentConfiguration());
         modelBuilder.ApplyConfiguration(new ResponseActionConfiguration());
         modelBuilder.ApplyConfiguration(new EvidenceConfiguration());
+        modelBuilder.ApplyConfiguration(new AuditLogConfiguration());
     }
 }
