@@ -26,6 +26,7 @@ public class AppDbContext : DbContext
     public DbSet<ResponseAction> ResponseActions => Set<ResponseAction>();
     public DbSet<Evidence> Evidence => Set<Evidence>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -48,5 +49,6 @@ public class AppDbContext : DbContext
         modelBuilder.ApplyConfiguration(new ResponseActionConfiguration());
         modelBuilder.ApplyConfiguration(new EvidenceConfiguration());
         modelBuilder.ApplyConfiguration(new AuditLogConfiguration());
+        modelBuilder.ApplyConfiguration(new RefreshTokenConfiguration());
     }
 }
