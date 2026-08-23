@@ -10,6 +10,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using IncidentPlatform.Api.Authentication;
 
+
+
 // Configured before WebApplication.CreateBuilder so that any startup failure
 // (e.g. a bad connection string, added in Phase 4) is itself captured by
 // Serilog instead of being lost to an unhandled exception before logging
@@ -65,6 +67,15 @@ try
     // Password hashing — standalone Identity PasswordHasher, not the full
     // Identity framework (see Authentication/PasswordHasher.cs for why).
     builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();
+
+    // JWT configuration — same fail-fast Options pattern as CorsSettings.
+    builder.Services
+        .AddOptions<JwtSettings>()
+        .Bind(builder.Configuration.GetSection(JwtSettings.SectionName))
+        .ValidateDataAnnotations()
+        .ValidateOnStart();
+
+    builder.Services.AddSingleton<IJwtService, JwtService>();
 
     // OpenAPI document generation. Exposed in non-Production only (see below).
     builder.Services.AddOpenApi();
