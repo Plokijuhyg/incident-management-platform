@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using IncidentPlatform.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using IncidentPlatform.Api.Authentication;
 
 // Configured before WebApplication.CreateBuilder so that any startup failure
 // (e.g. a bad connection string, added in Phase 4) is itself captured by
@@ -60,6 +61,10 @@ try
     // Services
     // -----------------------------------------------------------------------
     builder.Services.AddControllers();
+
+    // Password hashing — standalone Identity PasswordHasher, not the full
+    // Identity framework (see Authentication/PasswordHasher.cs for why).
+    builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();
 
     // OpenAPI document generation. Exposed in non-Production only (see below).
     builder.Services.AddOpenApi();
