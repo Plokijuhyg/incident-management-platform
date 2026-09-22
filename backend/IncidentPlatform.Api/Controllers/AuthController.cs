@@ -1,6 +1,9 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using IncidentPlatform.Api.DTOs.Auth;
 using IncidentPlatform.Api.Exceptions;
 using IncidentPlatform.Api.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -23,9 +26,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
-    public async Task<ActionResult<LoginResponse>> Login(
-        [FromBody] LoginRequest request,
-        CancellationToken cancellationToken)
+    public async Task<ActionResult<LoginResponse>> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
     {
         var result = await _authService.LoginAsync(request, GetClientIp(), cancellationToken);
         AppendRefreshTokenCookie(result.RawRefreshToken, result.RefreshTokenExpiresAt);
@@ -39,8 +40,6 @@ public class AuthController : ControllerBase
 
         if (string.IsNullOrEmpty(rawToken))
         {
-            // No cookie at all is the same generic 401 as an invalid one —
-            // nothing is gained by telling the caller which case applies.
             throw new AuthenticationFailedException();
         }
 
@@ -60,8 +59,46 @@ public class AuthController : ControllerBase
         }
 
         Response.Cookies.Delete(RefreshTokenCookieName, new CookieOptions { Path = "/api/auth" });
-
         return NoContent();
+    }
+
+    [HttpGet("me")]
+    [Authorize]
+    public ActionResult<MeResponse> Me()
+    {
+        var userId = GetCurrentUserId();
+
+        var email = User.FindFirst(ClaimTypes.Email)?.Value ?? string.Empty;         var fullName = User.FindFirst(ClaimTypes.Name)?.Value ?? string.Empty;
+        var roles = User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
+
+        return Ok(new MeResponse
+        {
+            Id = userId,
+            Email = email,
+            FullName = fullName,
+            Roles = roles
+        });
+    }
+
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+        await _authService.ChangePasswordAsync(userId, request, GetClientIp(), cancellationToken);
+        return NoContent();
+    }
+
+    private int GetCurrentUserId()
+    {
+        var idClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (idClaim is null || !int.TryParse(idClaim, out var userId))
+        {
+            throw new AuthenticationFailedException();
+        }
+
+        return userId;
     }
 
     private void AppendRefreshTokenCookie(string rawToken, DateTime expiresAt)
@@ -69,20 +106,9 @@ public class AuthController : ControllerBase
         Response.Cookies.Append(RefreshTokenCookieName, rawToken, new CookieOptions
         {
             HttpOnly = true,
-
-            // Secure means "HTTPS only". Local dev runs on plain HTTP
-            // (http://localhost:5230), so forcing Secure=true unconditionally
-            // would mean the cookie is set but the browser (or HttpClient in
-            // tests) never sends it back — a silent, confusing failure.
-            // Production always runs behind HTTPS, so this is safe.
             Secure = !_environment.IsDevelopment(),
-
             SameSite = SameSiteMode.Strict,
             Expires = expiresAt,
-
-            // Scoped to /api/auth only — this cookie has no reason to be
-            // sent on every single API request, only the auth endpoints
-            // that actually consume it.
             Path = "/api/auth"
         });
     }

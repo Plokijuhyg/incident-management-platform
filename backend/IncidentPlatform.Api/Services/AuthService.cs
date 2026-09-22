@@ -45,9 +45,6 @@ public class AuthService : IAuthService
 
         if (user is null || !user.IsActive)
         {
-            // Same generic exception for "no such user", "wrong password",
-            // and "deactivated" — api-design.md §2: distinguishing them is
-            // a user-enumeration oracle.
             throw new AuthenticationFailedException();
         }
 
@@ -103,15 +100,8 @@ public class AuthService : IAuthService
 
         if (token.IsRevoked)
         {
-            // The legitimate client already rotated past this token. Seeing
-            // it again means someone else has a copy — treat this as theft
-            // and burn every active token for the account, not just this one.
             await RevokeAllActiveTokensForUserAsync(
-                token.UserId,
-                ipAddress,
-                "Attempted reuse of a revoked refresh token",
-                cancellationToken);
-
+                token.UserId, ipAddress, "Attempted reuse of a revoked refresh token", cancellationToken);
             throw new AuthenticationFailedException();
         }
 
@@ -143,9 +133,6 @@ public class AuthService : IAuthService
         var token = await _dbContext.RefreshTokens
             .SingleOrDefaultAsync(t => t.TokenHash == tokenHash, cancellationToken);
 
-        // A missing or already-revoked token is treated as a successful
-        // no-op, not an error — a stale cookie should never make logout
-        // fail loudly for the user.
         if (token is not null && !token.IsRevoked)
         {
             token.RevokedAt = DateTime.UtcNow;
@@ -155,11 +142,40 @@ public class AuthService : IAuthService
         }
     }
 
-    private async Task RevokeAllActiveTokensForUserAsync(
-        int userId,
-        string ipAddress,
-        string reason,
-        CancellationToken cancellationToken)
+    public async Task ChangePasswordAsync(int userId, ChangePasswordRequest request, string ipAddress, CancellationToken cancellationToken = default)
+    {
+        var user = await _dbContext.Users.SingleOrDefaultAsync(u => u.Id == userId, cancellationToken);
+
+        if (user is null)
+        {
+            throw new NotFoundException("User", userId);
+        }
+
+        if (!_passwordHasher.Verify(user.PasswordHash, request.CurrentPassword))
+        {
+            throw new ValidationAppException("Current password is incorrect.");
+        }
+
+        user.PasswordHash = _passwordHasher.Hash(request.NewPassword);
+        user.UpdatedAt = DateTime.UtcNow;
+
+        // A password change invalidates every existing session — a stolen
+        // session must not survive a password change the real user made.
+        var activeTokens = await _dbContext.RefreshTokens
+            .Where(t => t.UserId == userId && t.RevokedAt == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var t in activeTokens)
+        {
+            t.RevokedAt = DateTime.UtcNow;
+            t.RevokedByIp = ipAddress;
+            t.ReasonRevoked = "Password changed";
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task RevokeAllActiveTokensForUserAsync(int userId, string ipAddress, string reason, CancellationToken cancellationToken)
     {
         var activeTokens = await _dbContext.RefreshTokens
             .Where(t => t.UserId == userId && t.RevokedAt == null)
@@ -177,9 +193,6 @@ public class AuthService : IAuthService
 
     private (RefreshToken Entity, string RawToken) GenerateRefreshToken(User user, string ipAddress)
     {
-        // 64 cryptographically random bytes, base64-encoded for the cookie
-        // value — far more entropy than is strictly necessary, deliberately,
-        // since this token alone grants a new access token on presentation.
         var rawToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
 
         var entity = new RefreshToken
@@ -194,22 +207,13 @@ public class AuthService : IAuthService
         return (entity, rawToken);
     }
 
-    // SHA-256, not a password hasher — this is a high-entropy random token,
-    // not a human-chosen password, so there's no offline brute-force risk
-    // to defend against with a slow, salted algorithm. A fast, deterministic
-    // hash is exactly what a lookup-by-hash query needs.
     private static string HashToken(string rawToken)
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(rawToken));
         return Convert.ToHexString(bytes);
     }
 
-    private AuthResult BuildAuthResult(
-        User user,
-        List<string> roleNames,
-        string accessToken,
-        string rawRefreshToken,
-        DateTime refreshTokenExpiresAt)
+    private AuthResult BuildAuthResult(User user, List<string> roleNames, string accessToken, string rawRefreshToken, DateTime refreshTokenExpiresAt)
     {
         return new AuthResult
         {

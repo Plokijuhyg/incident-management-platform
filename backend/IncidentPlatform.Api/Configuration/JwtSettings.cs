@@ -2,11 +2,6 @@ using System.ComponentModel.DataAnnotations;
 
 namespace IncidentPlatform.Api.Configuration;
 
-/// <summary>
-/// Bound via AddOptions&lt;JwtSettings&gt;() with ValidateOnStart() in
-/// Program.cs — a missing or too-short secret fails the app at startup
-/// (architecture.md §5), not on the first login attempt.
-/// </summary>
 public sealed class JwtSettings
 {
     public const string SectionName = "Jwt";
@@ -26,6 +21,5 @@ public sealed class JwtSettings
 
     [Range(1, 90, ErrorMessage = "Jwt:RefreshTokenExpirationDays must be between 1 and 90.")]
     public int RefreshTokenExpirationDays { get; init; } = 7;
-
 }
 
