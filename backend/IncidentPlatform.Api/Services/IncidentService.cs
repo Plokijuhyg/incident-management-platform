@@ -3,6 +3,7 @@ using IncidentPlatform.Api.DTOs.Common;
 using IncidentPlatform.Api.DTOs.Incidents;
 using IncidentPlatform.Api.Exceptions;
 using IncidentPlatform.Api.Interfaces;
+using IncidentPlatform.Api.Mapping;
 using IncidentPlatform.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,7 +23,7 @@ public class IncidentService : IIncidentService
     public async Task<PagedResult<IncidentSummaryResponse>> GetPagedAsync(int page, int pageSize, CancellationToken cancellationToken = default)
     {
         page = Math.Max(page, 1);
-        pageSize = Math.Clamp(pageSize, 1, 100); // api-design.md §1: capped at 100 server-side
+        pageSize = Math.Clamp(pageSize, 1, 100);
 
         var query = _dbContext.Incidents
             .OrderByDescending(i => i.CreatedAt)
@@ -59,32 +60,14 @@ public class IncidentService : IIncidentService
     public async Task<IncidentDetailResponse> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         var incident = await FindIncidentOrThrowAsync(id, cancellationToken);
-        return ToDetailResponse(incident);
+        return IncidentMapper.ToDetailResponse(incident);
     }
 
     public async Task<IncidentDetailResponse> CreateAsync(IncidentCreateRequest request, CancellationToken cancellationToken = default)
     {
-        // Race-safe incident numbering (database-design.md §3.3): lock the
-        // current year's counter row for the duration of this transaction,
-        // so two concurrent creates cannot read and increment the same value.
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
-        var year = DateTime.UtcNow.Year;
-
-        var sequence = await _dbContext.IncidentNumberSequences
-            .FromSqlInterpolated($"SELECT * FROM IncidentNumberSequences WHERE Year = {year} FOR UPDATE")
-            .SingleOrDefaultAsync(cancellationToken);
-
-        if (sequence is null)
-        {
-            sequence = new IncidentNumberSequence { Year = year, LastValue = 0, UpdatedAt = DateTime.UtcNow };
-            _dbContext.IncidentNumberSequences.Add(sequence);
-        }
-
-        sequence.LastValue++;
-        sequence.UpdatedAt = DateTime.UtcNow;
-
-        var incidentNumber = $"INC-{year}-{sequence.LastValue:D6}";
+        var incidentNumber = await IncidentNumberGenerator.GenerateNextAsync(_dbContext, cancellationToken);
 
         var incident = new Incident
         {
@@ -109,7 +92,7 @@ public class IncidentService : IIncidentService
 
         await _dbContext.Entry(incident).Reference(i => i.CreatedBy).LoadAsync(cancellationToken);
 
-        return ToDetailResponse(incident);
+        return IncidentMapper.ToDetailResponse(incident);
     }
 
     public async Task<IncidentDetailResponse> UpdateAsync(int id, IncidentUpdateRequest request, CancellationToken cancellationToken = default)
@@ -133,14 +116,11 @@ public class IncidentService : IIncidentService
 
         await SaveWithConcurrencyCheckAsync(cancellationToken);
 
-        return ToDetailResponse(incident);
+        return IncidentMapper.ToDetailResponse(incident);
     }
 
     public async Task<IncidentDetailResponse> AssignAsync(int id, AssignIncidentRequest request, CancellationToken cancellationToken = default)
     {
-        // api-design.md §3: assign is Manager/Admin only — enforced here at
-        // the [Authorize(Roles=...)] level on the controller already, but
-        // the assignee itself must be validated to exist.
         var incident = await FindIncidentOrThrowAsync(id, cancellationToken);
 
         var assigneeExists = await _dbContext.Users.AnyAsync(u => u.Id == request.AssignedToId && u.IsActive, cancellationToken);
@@ -159,7 +139,7 @@ public class IncidentService : IIncidentService
         await _dbContext.SaveChangesAsync(cancellationToken);
         await _dbContext.Entry(incident).Reference(i => i.AssignedTo).LoadAsync(cancellationToken);
 
-        return ToDetailResponse(incident);
+        return IncidentMapper.ToDetailResponse(incident);
     }
 
     public async Task<IncidentDetailResponse> ChangeStatusAsync(int id, ChangeStatusRequest request, CancellationToken cancellationToken = default)
@@ -173,9 +153,6 @@ public class IncidentService : IIncidentService
         incident.UpdatedAt = DateTime.UtcNow;
         incident.Version++;
 
-        // Milestone timestamps are set on transition, never derived later
-        // (database-design.md §4.3) — this is what dashboard MTTD/MTTC/MTTR
-        // metrics will read from directly.
         var now = DateTime.UtcNow;
         switch (request.Status)
         {
@@ -195,13 +172,11 @@ public class IncidentService : IIncidentService
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return ToDetailResponse(incident);
+        return IncidentMapper.ToDetailResponse(incident);
     }
 
     public async Task<IncidentDetailResponse> CloseAsync(int id, CloseIncidentRequest request, CancellationToken cancellationToken = default)
     {
-        // api-design.md §3: close is Manager/Admin only (enforced via
-        // [Authorize] on the controller), requires a resolution summary.
         var incident = await FindIncidentOrThrowAsync(id, cancellationToken);
 
         incident.Status = IncidentStatus.Closed;
@@ -215,12 +190,8 @@ public class IncidentService : IIncidentService
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return ToDetailResponse(incident);
+        return IncidentMapper.ToDetailResponse(incident);
     }
-
-    // -------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------
 
     private async Task<Incident> FindIncidentOrThrowAsync(int id, CancellationToken cancellationToken)
     {
@@ -232,14 +203,6 @@ public class IncidentService : IIncidentService
         return incident ?? throw new NotFoundException("Incident", id);
     }
 
-    /// <summary>
-    /// api-design.md §3, footnote 1: analysts may modify incidents assigned
-    /// to them; managers and admins, any. Enforced here in the service
-    /// layer, not the route — exactly per architecture.md's stated rule
-    /// that authorization on a *specific resource* belongs in services,
-    /// while [Authorize(Roles=...)] on the controller only handles the
-    /// coarse "is this role allowed to hit this endpoint at all" check.
-    /// </summary>
     private void EnforceModifyPermission(Incident incident)
     {
         if (_currentUser.IsInRole(RoleNames.Admin) || _currentUser.IsInRole(RoleNames.SecurityManager))
@@ -267,7 +230,7 @@ public class IncidentService : IIncidentService
             IsSystemGenerated = false
         });
 
-        await Task.CompletedTask; // kept async-shaped for consistency; entity is saved by the caller's SaveChangesAsync
+        await Task.CompletedTask;
     }
 
     private async Task SaveWithConcurrencyCheckAsync(CancellationToken cancellationToken)
@@ -281,30 +244,4 @@ public class IncidentService : IIncidentService
             throw new ConflictException("This incident was modified by someone else. Reload and try again.");
         }
     }
-
-    private static IncidentDetailResponse ToDetailResponse(Incident i) => new()
-    {
-        Id = i.Id,
-        IncidentNumber = i.IncidentNumber,
-        Title = i.Title,
-        Description = i.Description,
-        Severity = i.Severity,
-        Priority = i.Priority,
-        Status = i.Status,
-        Category = i.Category,
-        Source = i.Source,
-        CreatedById = i.CreatedById,
-        CreatedByName = i.CreatedBy?.FullName ?? string.Empty,
-        AssignedToId = i.AssignedToId,
-        AssignedToName = i.AssignedTo?.FullName,
-        DetectedAt = i.DetectedAt,
-        CreatedAt = i.CreatedAt,
-        UpdatedAt = i.UpdatedAt,
-        TriagedAt = i.TriagedAt,
-        ContainedAt = i.ContainedAt,
-        ResolvedAt = i.ResolvedAt,
-        ClosedAt = i.ClosedAt,
-        ResolutionSummary = i.ResolutionSummary,
-        Version = i.Version
-    };
 }
