@@ -3,6 +3,7 @@ using FluentValidation.AspNetCore;
 using IncidentPlatform.Api.Authentication;
 using IncidentPlatform.Api.Configuration;
 using IncidentPlatform.Api.Data;
+using IncidentPlatform.Api.Models;
 using IncidentPlatform.Api.Interfaces;
 using IncidentPlatform.Api.Middleware;
 using IncidentPlatform.Api.Services;
@@ -56,6 +57,10 @@ try
     builder.Services.AddHealthChecks();
     builder.Services.AddProblemDetails();
     builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+
+    builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUser, CurrentUser>();
+builder.Services.AddScoped<IIncidentService, IncidentService>();
 
     builder.Services
         .AddOptions<CorsSettings>()
