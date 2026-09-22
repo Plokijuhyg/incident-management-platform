@@ -23,4 +23,9 @@ public sealed class JwtSettings
 
     [Range(1, 1440, ErrorMessage = "Jwt:AccessTokenExpirationMinutes must be between 1 and 1440.")]
     public int AccessTokenExpirationMinutes { get; init; } = 15;
+
+    [Range(1, 90, ErrorMessage = "Jwt:RefreshTokenExpirationDays must be between 1 and 90.")]
+    public int RefreshTokenExpirationDays { get; init; } = 7;
+
 }
+
