@@ -61,7 +61,9 @@ try
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddScoped<ICurrentUser, CurrentUser>();
     builder.Services.AddScoped<IIncidentService, IncidentService>();
+    builder.Services.AddScoped<IIocService, IocService>();
     builder.Services.AddScoped<IAlertService, AlertService>();
+    builder.Services.AddScoped<IAssetService, AssetService>();
     builder.Services
         .AddOptions<CorsSettings>()
         .Bind(builder.Configuration.GetSection(CorsSettings.SectionName))
