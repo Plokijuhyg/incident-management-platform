@@ -16,6 +16,7 @@ namespace IncidentPlatform.Tests;
 public class AssetsControllerTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly WebApplicationFactory<Program> _factory;
+    private string? hostname;
 
     public AssetsControllerTests(WebApplicationFactory<Program> factory)
     {
@@ -44,23 +45,29 @@ public class AssetsControllerTests : IClassFixture<WebApplicationFactory<Program
         return email;
     }
 
-    private async Task CleanupUserAsync(string email)
-    {
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+   private async Task CleanupUserAsync(string email, string? assetHostnamePrefix = null)
+{
+    using var scope = _factory.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var user = db.Users.SingleOrDefault(u => u.Email == email);
-        if (user is not null)
+    var user = db.Users.SingleOrDefault(u => u.Email == email);
+    if (user is not null)
+    {
+        var incidentIds = db.Incidents.Where(i => i.CreatedById == user.Id).Select(i => i.Id).ToList();
+        db.IncidentAssets.RemoveRange(db.IncidentAssets.Where(ia => incidentIds.Contains(ia.IncidentId)));
+
+        if (assetHostnamePrefix is not null)
         {
-            var incidentIds = db.Incidents.Where(i => i.CreatedById == user.Id).Select(i => i.Id).ToList();
-            db.IncidentAssets.RemoveRange(db.IncidentAssets.Where(ia => incidentIds.Contains(ia.IncidentId)));
-            db.Incidents.RemoveRange(db.Incidents.Where(i => i.CreatedById == user.Id || i.AssignedToId == user.Id));
-            db.RefreshTokens.RemoveRange(db.RefreshTokens.Where(t => t.UserId == user.Id));
-            db.UserRoles.RemoveRange(db.UserRoles.Where(ur => ur.UserId == user.Id));
-            db.Users.Remove(user);
-            await db.SaveChangesAsync();
+            db.Assets.RemoveRange(db.Assets.Where(a => a.Hostname != null && a.Hostname.StartsWith(assetHostnamePrefix)));
         }
+
+        db.Incidents.RemoveRange(db.Incidents.Where(i => i.CreatedById == user.Id || i.AssignedToId == user.Id));
+        db.RefreshTokens.RemoveRange(db.RefreshTokens.Where(t => t.UserId == user.Id));
+        db.UserRoles.RemoveRange(db.UserRoles.Where(ur => ur.UserId == user.Id));
+        db.Users.Remove(user);
+        await db.SaveChangesAsync();
     }
+}
 
     private async Task<HttpClient> AuthenticatedClientAsync(string email)
     {
@@ -100,10 +107,17 @@ public class AssetsControllerTests : IClassFixture<WebApplicationFactory<Program
         {
             var client = await AuthenticatedClientAsync(email);
 
-            var createResponse = await client.PostAsJsonAsync("/api/assets", new AssetCreateRequest
+            var hostname = $"db-srv-{Guid.NewGuid():N}.corp.local";
+
+            HttpResponseMessage httpResponseMessage1 = await client.PostAsJsonAsync("/api/assets", new AssetCreateRequest
             {
-                Name = "DB-SRV-01", Hostname = "db-srv-01.corp.local", Type = AssetType.Server, Criticality = AssetCriticality.Critical
+                Name = "DB-SRV-01",
+                Hostname = hostname,
+                Type = AssetType.Server,
+                Criticality = AssetCriticality.Critical
             });
+            HttpResponseMessage httpResponseMessage = httpResponseMessage1;
+            var createResponse = httpResponseMessage;
 
             Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
             var created = await createResponse.Content.ReadFromJsonAsync<AssetResponse>();
@@ -113,7 +127,7 @@ public class AssetsControllerTests : IClassFixture<WebApplicationFactory<Program
         }
         finally
         {
-            await CleanupUserAsync(email);
+            await CleanupUserAsync(email, hostname);
         }
     }
 
@@ -125,21 +139,23 @@ public class AssetsControllerTests : IClassFixture<WebApplicationFactory<Program
         {
             var client = await AuthenticatedClientAsync(email);
 
+            var hostname = $"dup-{Guid.NewGuid():N}.corp.local";
+
             await client.PostAsJsonAsync("/api/assets", new AssetCreateRequest
             {
-                Name = "Host A", Hostname = "dup.corp.local", Type = AssetType.Workstation, Criticality = AssetCriticality.Low
+                Name = "Host A", Hostname = hostname, Type = AssetType.Workstation, Criticality = AssetCriticality.Low
             });
 
             var secondResponse = await client.PostAsJsonAsync("/api/assets", new AssetCreateRequest
-            {
-                Name = "Host B", Hostname = "dup.corp.local", Type = AssetType.Workstation, Criticality = AssetCriticality.Low
-            });
+{
+    Name = "Host B", Hostname = hostname, Type = AssetType.Workstation, Criticality = AssetCriticality.Low
+});
 
             Assert.Equal(HttpStatusCode.Conflict, secondResponse.StatusCode);
         }
-        finally
+       finally
         {
-            await CleanupUserAsync(email);
+            await CleanupUserAsync(email, hostname);
         }
     }
 

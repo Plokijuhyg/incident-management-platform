@@ -64,6 +64,8 @@ try
     builder.Services.AddScoped<IIocService, IocService>();
     builder.Services.AddScoped<IAlertService, AlertService>();
     builder.Services.AddScoped<IAssetService, AssetService>();
+    builder.Services.AddScoped<IMitreService, MitreService>();
+    builder.Services.AddScoped<IIncidentSubResourceService, IncidentSubResourceService>();
     builder.Services
         .AddOptions<CorsSettings>()
         .Bind(builder.Configuration.GetSection(CorsSettings.SectionName))
@@ -168,6 +170,7 @@ try
         var adminPassword = app.Configuration["Admin:Password"];
 
         await DataSeeder.SeedAsync(dbContext, passwordHasher, adminEmail, adminPassword, seedLogger);
+                await MitreSeedData.SeedAsync(dbContext);
     }
 
     app.Run();
