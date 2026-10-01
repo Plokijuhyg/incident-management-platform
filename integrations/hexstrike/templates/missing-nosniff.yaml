@@ -1,0 +1,20 @@
+id: incident-missing-nosniff
+info:
+  name: HTTP response missing X-Content-Type-Options nosniff
+  author: incident-platform
+  severity: low
+  description: Hardening observation on the root response; context-dependent, not a CVE.
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/"
+    redirects: false
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: word
+        part: header
+        words: ["x-content-type-options:"]
+        case-insensitive: true
+        negative: true

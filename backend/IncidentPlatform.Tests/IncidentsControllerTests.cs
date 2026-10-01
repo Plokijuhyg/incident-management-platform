@@ -14,11 +14,11 @@ using Xunit;
 
 namespace IncidentPlatform.Tests;
 
-public class IncidentsControllerTests : IClassFixture<WebApplicationFactory<Program>>
+public class IncidentsControllerTests : IClassFixture<TestApiFactory>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly TestApiFactory _factory;
 
-    public IncidentsControllerTests(WebApplicationFactory<Program> factory)
+    public IncidentsControllerTests(TestApiFactory factory)
     {
         _factory = factory;
     }
@@ -60,6 +60,7 @@ public class IncidentsControllerTests : IClassFixture<WebApplicationFactory<Prog
             db.RefreshTokens.RemoveRange(db.RefreshTokens.Where(t => t.UserId == user.Id));
             db.UserRoles.RemoveRange(db.UserRoles.Where(ur => ur.UserId == user.Id));
             db.Incidents.RemoveRange(db.Incidents.Where(i => i.CreatedById == user.Id || i.AssignedToId == user.Id));
+            db.AuditLogs.RemoveRange(db.AuditLogs.Where(a => a.ActorUserId == user.Id || a.ActorEmail == email));
             db.Users.Remove(user);
             await db.SaveChangesAsync();
         }
@@ -333,6 +334,129 @@ public class IncidentsControllerTests : IClassFixture<WebApplicationFactory<Prog
         finally
         {
             await CleanupUserAsync(email);
+        }
+    }
+
+    private static IncidentCreateRequest NewIncident(string title) => new()
+    {
+        Title = title,
+        Description = "desc",
+        Severity = IncidentSeverity.Low,
+        Priority = IncidentPriority.Low,
+        Category = IncidentCategory.Other,
+        Source = IncidentSource.Manual
+    };
+
+    [Fact]
+    public async Task ChangeStatus_ToClosed_Returns400_EvenForAssignedAnalyst()
+    {
+        var (managerEmail, _) = await CreateUserWithRoleAsync(RoleNames.SecurityManager);
+        var (analystEmail, analystId) = await CreateUserWithRoleAsync(RoleNames.SocAnalyst);
+
+        try
+        {
+            var manager = await AuthenticatedClientAsync(managerEmail);
+            var created = await (await manager.PostAsJsonAsync("/api/incidents", NewIncident("Close bypass test")))
+                .Content.ReadFromJsonAsync<IncidentDetailResponse>();
+            (await manager.PostAsJsonAsync($"/api/incidents/{created!.Id}/assign",
+                new AssignIncidentRequest { AssignedToId = analystId })).EnsureSuccessStatusCode();
+
+            var analyst = await AuthenticatedClientAsync(analystEmail);
+            var response = await analyst.PostAsJsonAsync($"/api/incidents/{created.Id}/status",
+                new ChangeStatusRequest { Status = IncidentStatus.Closed });
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var current = await analyst.GetFromJsonAsync<IncidentDetailResponse>($"/api/incidents/{created.Id}");
+            Assert.NotEqual(IncidentStatus.Closed, current!.Status);
+            Assert.Null(current.ClosedAt);
+        }
+        finally
+        {
+            await CleanupUserAsync(analystEmail);
+            await CleanupUserAsync(managerEmail);
+        }
+    }
+
+    [Fact]
+    public async Task ChangeStatus_ReopenClosedIncident_RequiresManagerAndClearsClosedAt()
+    {
+        var (managerEmail, _) = await CreateUserWithRoleAsync(RoleNames.SecurityManager);
+        var (analystEmail, analystId) = await CreateUserWithRoleAsync(RoleNames.SocAnalyst);
+
+        try
+        {
+            var manager = await AuthenticatedClientAsync(managerEmail);
+            var created = await (await manager.PostAsJsonAsync("/api/incidents", NewIncident("Reopen test")))
+                .Content.ReadFromJsonAsync<IncidentDetailResponse>();
+            (await manager.PostAsJsonAsync($"/api/incidents/{created!.Id}/assign",
+                new AssignIncidentRequest { AssignedToId = analystId })).EnsureSuccessStatusCode();
+            (await manager.PostAsJsonAsync($"/api/incidents/{created.Id}/close",
+                new CloseIncidentRequest { ResolutionSummary = "Done" })).EnsureSuccessStatusCode();
+
+            var analyst = await AuthenticatedClientAsync(analystEmail);
+            var analystReopen = await analyst.PostAsJsonAsync($"/api/incidents/{created.Id}/status",
+                new ChangeStatusRequest { Status = IncidentStatus.Investigating });
+            Assert.Equal(HttpStatusCode.Forbidden, analystReopen.StatusCode);
+
+            var managerReopen = await manager.PostAsJsonAsync($"/api/incidents/{created.Id}/status",
+                new ChangeStatusRequest { Status = IncidentStatus.Investigating, Note = "New evidence" });
+            Assert.Equal(HttpStatusCode.OK, managerReopen.StatusCode);
+            var reopened = await managerReopen.Content.ReadFromJsonAsync<IncidentDetailResponse>();
+            Assert.Equal(IncidentStatus.Investigating, reopened!.Status);
+            Assert.Null(reopened.ClosedAt);
+        }
+        finally
+        {
+            await CleanupUserAsync(analystEmail);
+            await CleanupUserAsync(managerEmail);
+        }
+    }
+
+    private sealed class FixedUser(int id, params string[] roles) : IncidentPlatform.Api.Interfaces.ICurrentUser
+    {
+        public int Id => id;
+        public IReadOnlyList<string> Roles => roles;
+        public bool IsInRole(string role) => roles.Contains(role);
+    }
+
+    [Fact]
+    public async Task StatusAssignAndClose_OnConcurrentlyModifiedIncident_ThrowConflict()
+    {
+        var (managerEmail, managerId) = await CreateUserWithRoleAsync(RoleNames.SecurityManager);
+
+        try
+        {
+            var manager = await AuthenticatedClientAsync(managerEmail);
+            var created = await (await manager.PostAsJsonAsync("/api/incidents", NewIncident("Concurrency test")))
+                .Content.ReadFromJsonAsync<IncidentDetailResponse>();
+
+            var operations = new Func<IncidentPlatform.Api.Services.IncidentService, Task>[]
+            {
+                s => s.ChangeStatusAsync(created!.Id, new ChangeStatusRequest { Status = IncidentStatus.Triaged }),
+                s => s.AssignAsync(created!.Id, new AssignIncidentRequest { AssignedToId = managerId }),
+                s => s.CloseAsync(created!.Id, new CloseIncidentRequest { ResolutionSummary = "Done" })
+            };
+
+            foreach (var operation in operations)
+            {
+                // Context A tracks the incident; another writer then bumps Version underneath it.
+                using var scope = _factory.Services.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                Assert.NotNull(await db.Incidents.FindAsync(created!.Id));
+                using (var otherScope = _factory.Services.CreateScope())
+                {
+                    var other = otherScope.ServiceProvider.GetRequiredService<AppDbContext>();
+                    await other.Incidents.Where(i => i.Id == created.Id)
+                        .ExecuteUpdateAsync(u => u.SetProperty(i => i.Version, i => i.Version + 1));
+                }
+
+                var service = new IncidentPlatform.Api.Services.IncidentService(db, new FixedUser(managerId, RoleNames.SecurityManager));
+                await Assert.ThrowsAsync<IncidentPlatform.Api.Exceptions.ConflictException>(() => operation(service));
+            }
+        }
+        finally
+        {
+            await CleanupUserAsync(managerEmail);
         }
     }
 }

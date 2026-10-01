@@ -1,0 +1,11 @@
+{
+  "Endpoint": "https://siem.example.internal:7146/api/telemetry/events",
+  "AgentId": "metasploitable3-events",
+  "TokenFile": "C:\\ProgramData\\IncidentPlatformAgent\\token.dpapi",
+  "StateDirectory": "C:\\ProgramData\\IncidentPlatformAgent\\state",
+  "Channels": [
+    "Security",
+    "System",
+    "Application"
+  ]
+}

@@ -7,7 +7,16 @@ public enum AlertSource
     Firewall,
     Ids,
     EmailSecurity,
-    Manual
+    Manual,
+
+    /// <summary>
+    /// Findings from an authorized offensive-security tool (e.g. HexStrike
+    /// AI on an isolated Kali VM). Blue-team platform consumes red-team
+    /// output as input only — no live-triggering path exists
+    /// (docs/architecture.md §7).
+    /// </summary>
+    PenTest,
+    WindowsEvent
 }
 
 public enum AlertStatus
@@ -27,6 +36,7 @@ public enum AlertStatus
 /// </summary>
 public class Alert
 {
+    public string? EnrichmentJson { get; set; }
     public int Id { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }

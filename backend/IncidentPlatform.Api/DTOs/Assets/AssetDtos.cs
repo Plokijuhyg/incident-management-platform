@@ -4,6 +4,9 @@ namespace IncidentPlatform.Api.DTOs.Assets;
 
 public class AssetResponse
 {
+    public int LogEventCount { get; set; }
+    public DateTime? LastEventAt { get; set; }
+    public string CollectionStatus { get; set; } = "No logs received";
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Hostname { get; set; }

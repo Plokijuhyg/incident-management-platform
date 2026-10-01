@@ -40,6 +40,9 @@ namespace IncidentPlatform.Api.Migrations
                     b.Property<DateTime>("DetectedAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<string>("EnrichmentJson")
+                        .HasColumnType("json");
+
                     b.Property<string>("ExternalId")
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
@@ -234,6 +237,191 @@ namespace IncidentPlatform.Api.Migrations
                     b.ToTable("AuditLogs", (string)null);
                 });
 
+            modelBuilder.Entity("IncidentPlatform.Api.Models.AutomationDecision", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("AlertId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("IncidentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Machine")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<string>("PolicySnapshot")
+                        .IsRequired()
+                        .HasColumnType("json");
+
+                    b.Property<int>("PolicyVersion")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("varchar(1024)");
+
+                    b.Property<string>("RuleId")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AlertId")
+                        .IsUnique();
+
+                    b.HasIndex("IncidentId");
+
+                    b.HasIndex("RuleId", "Machine", "CreatedAt");
+
+                    b.ToTable("AutomationDecisions");
+                });
+
+            modelBuilder.Entity("IncidentPlatform.Api.Models.AutomationRule", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<int?>("ApprovedById")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CorrelationMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("EffectiveFrom")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<int?>("OwnerId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApprovedById");
+
+                    b.HasIndex("OwnerId");
+
+                    b.ToTable("AutomationRules");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = "WIN-DEFENDER-DETECTION",
+                            CorrelationMinutes = 60,
+                            EffectiveFrom = new DateTime(2026, 9, 26, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Mode = "Observe",
+                            UpdatedAt = new DateTime(2026, 9, 26, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = "WIN-AUDIT-CLEARED",
+                            CorrelationMinutes = 60,
+                            EffectiveFrom = new DateTime(2026, 9, 26, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Mode = "Observe",
+                            UpdatedAt = new DateTime(2026, 9, 26, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = "WIN-ACCOUNT-CREATED",
+                            CorrelationMinutes = 60,
+                            EffectiveFrom = new DateTime(2026, 9, 26, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Mode = "Observe",
+                            UpdatedAt = new DateTime(2026, 9, 26, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = "WIN-LOCAL-GROUP-MEMBER",
+                            CorrelationMinutes = 60,
+                            EffectiveFrom = new DateTime(2026, 9, 26, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Mode = "Observe",
+                            UpdatedAt = new DateTime(2026, 9, 26, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Version = 1
+                        });
+                });
+
+            modelBuilder.Entity("IncidentPlatform.Api.Models.DetectionRule", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("DefinitionJson")
+                        .IsRequired()
+                        .HasColumnType("json");
+
+                    b.Property<bool>("Enabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("ExternalRuleId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("varchar(36)");
+
+                    b.Property<string>("ReferenceTag")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("varchar(512)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Enabled");
+
+                    b.HasIndex("ExternalRuleId")
+                        .IsUnique();
+
+                    b.ToTable("DetectionRules");
+                });
+
             modelBuilder.Entity("IncidentPlatform.Api.Models.Evidence", b =>
                 {
                     b.Property<int>("Id")
@@ -335,6 +523,9 @@ namespace IncidentPlatform.Api.Migrations
                     b.Property<DateTime?>("DetectedAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<string>("EnrichmentJson")
+                        .HasColumnType("json");
+
                     b.Property<string>("FalsePositiveReason")
                         .HasMaxLength(500)
                         .HasColumnType("varchar(500)");
@@ -343,6 +534,9 @@ namespace IncidentPlatform.Api.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)");
+
+                    b.Property<DateTime?>("OccurredAt")
+                        .HasColumnType("datetime(6)");
 
                     b.Property<string>("Priority")
                         .IsRequired()
@@ -539,6 +733,39 @@ namespace IncidentPlatform.Api.Migrations
                     b.HasIndex("MitreTechniqueId");
 
                     b.ToTable("IncidentMitreTechniques", (string)null);
+                });
+
+            modelBuilder.Entity("IncidentPlatform.Api.Models.IncidentNotification", b =>
+                {
+                    b.Property<int>("IncidentId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<DateTime>("NextAttemptAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("SentAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.HasKey("IncidentId");
+
+                    b.HasIndex("State", "NextAttemptAt");
+
+                    b.ToTable("IncidentNotifications");
                 });
 
             modelBuilder.Entity("IncidentPlatform.Api.Models.IncidentNumberSequence", b =>
@@ -862,6 +1089,78 @@ namespace IncidentPlatform.Api.Migrations
                     b.ToTable("Roles", (string)null);
                 });
 
+            modelBuilder.Entity("IncidentPlatform.Api.Models.SecurityAssessment", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(36)
+                        .HasColumnType("varchar(36)");
+
+                    b.Property<string>("AnalysisJson")
+                        .HasColumnType("json");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<string>("EvidenceSha256")
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<DateTime?>("FinishedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("ObservationsJson")
+                        .HasColumnType("json");
+
+                    b.Property<string>("Profile")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("RawResponse")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("RequestJson")
+                        .HasColumnType("json");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("RequestedById")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.Property<string>("TargetId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("TargetIp")
+                        .IsRequired()
+                        .HasMaxLength(45)
+                        .HasColumnType("varchar(45)");
+
+                    b.Property<string>("TargetName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RequestedById");
+
+                    b.HasIndex("Status", "RequestedAt");
+
+                    b.ToTable("SecurityAssessments");
+                });
+
             modelBuilder.Entity("IncidentPlatform.Api.Models.User", b =>
                 {
                     b.Property<int>("Id")
@@ -944,6 +1243,124 @@ namespace IncidentPlatform.Api.Migrations
                     b.ToTable("UserRoles", (string)null);
                 });
 
+            modelBuilder.Entity("IncidentPlatform.Api.Models.WindowsEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<int?>("AlertId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<int>("EventId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<int>("Level")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Machine")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("RawXml")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<long?>("RecordId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("TimeCreated")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AlertId");
+
+                    b.HasIndex("Fingerprint")
+                        .IsUnique();
+
+                    b.HasIndex("ReceivedAt");
+
+                    b.HasIndex("Channel", "Id");
+
+                    b.HasIndex("EventId", "Id");
+
+                    b.ToTable("WindowsEvents");
+                });
+
+            modelBuilder.Entity("IncidentPlatform.Api.Models.WindowsEventCheckpoint", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Bookmark")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(1024)
+                        .HasColumnType("varchar(1024)");
+
+                    b.Property<bool>("HasBacklog")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<DateTime?>("LastCheckedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("LastEventAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Machine")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Machine", "Channel")
+                        .IsUnique();
+
+                    b.ToTable("WindowsEventCheckpoints");
+                });
+
             modelBuilder.Entity("IncidentPlatform.Api.Models.Alert", b =>
                 {
                     b.HasOne("IncidentPlatform.Api.Models.Incident", "Incident")
@@ -969,6 +1386,39 @@ namespace IncidentPlatform.Api.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("ActorUser");
+                });
+
+            modelBuilder.Entity("IncidentPlatform.Api.Models.AutomationDecision", b =>
+                {
+                    b.HasOne("IncidentPlatform.Api.Models.Alert", null)
+                        .WithMany()
+                        .HasForeignKey("AlertId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("IncidentPlatform.Api.Models.Incident", null)
+                        .WithMany()
+                        .HasForeignKey("IncidentId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("IncidentPlatform.Api.Models.AutomationRule", null)
+                        .WithMany()
+                        .HasForeignKey("RuleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("IncidentPlatform.Api.Models.AutomationRule", b =>
+                {
+                    b.HasOne("IncidentPlatform.Api.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("ApprovedById")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("IncidentPlatform.Api.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("IncidentPlatform.Api.Models.Evidence", b =>
@@ -1108,6 +1558,17 @@ namespace IncidentPlatform.Api.Migrations
                     b.Navigation("MitreTechnique");
                 });
 
+            modelBuilder.Entity("IncidentPlatform.Api.Models.IncidentNotification", b =>
+                {
+                    b.HasOne("IncidentPlatform.Api.Models.Incident", "Incident")
+                        .WithMany()
+                        .HasForeignKey("IncidentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Incident");
+                });
+
             modelBuilder.Entity("IncidentPlatform.Api.Models.IncidentTimelineEvent", b =>
                 {
                     b.HasOne("IncidentPlatform.Api.Models.User", "ActorUser")
@@ -1184,6 +1645,15 @@ namespace IncidentPlatform.Api.Migrations
                     b.Navigation("TargetAsset");
                 });
 
+            modelBuilder.Entity("IncidentPlatform.Api.Models.SecurityAssessment", b =>
+                {
+                    b.HasOne("IncidentPlatform.Api.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("RequestedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("IncidentPlatform.Api.Models.UserRole", b =>
                 {
                     b.HasOne("IncidentPlatform.Api.Models.User", "AssignedBy")
@@ -1209,6 +1679,14 @@ namespace IncidentPlatform.Api.Migrations
                     b.Navigation("Role");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("IncidentPlatform.Api.Models.WindowsEvent", b =>
+                {
+                    b.HasOne("IncidentPlatform.Api.Models.Alert", null)
+                        .WithMany()
+                        .HasForeignKey("AlertId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("IncidentPlatform.Api.Models.Role", b =>

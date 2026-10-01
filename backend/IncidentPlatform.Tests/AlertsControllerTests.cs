@@ -13,11 +13,11 @@ using Xunit;
 
 namespace IncidentPlatform.Tests;
 
-public class AlertsControllerTests : IClassFixture<WebApplicationFactory<Program>>
+public class AlertsControllerTests : IClassFixture<TestApiFactory>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly TestApiFactory _factory;
 
-    public AlertsControllerTests(WebApplicationFactory<Program> factory)
+    public AlertsControllerTests(TestApiFactory factory)
     {
         _factory = factory;
     }
@@ -54,7 +54,7 @@ public class AlertsControllerTests : IClassFixture<WebApplicationFactory<Program
     {
         // Alerts.TriagedById -> Users is RESTRICT, so any alert this user
         // triaged (promoted or marked false-positive) must go first.
-        db.Alerts.RemoveRange(db.Alerts.Where(a => a.TriagedById == user.Id));
+        db.Alerts.RemoveRange(db.Alerts.Where(a => a.TriagedById == user.Id || db.AuditLogs.Any(log => log.ActorUserId == user.Id && log.EntityType == "Alert" && log.EntityId == a.Id.ToString() && log.Action == "ALERT_CREATED")));
 
         // Incidents.CreatedById / AssignedToId -> Users are also RESTRICT.
         // IncidentTimelineEvents CASCADE from Incident, so deleting the
@@ -65,6 +65,7 @@ public class AlertsControllerTests : IClassFixture<WebApplicationFactory<Program
 
         db.RefreshTokens.RemoveRange(db.RefreshTokens.Where(t => t.UserId == user.Id));
         db.UserRoles.RemoveRange(db.UserRoles.Where(ur => ur.UserId == user.Id));
+        db.AuditLogs.RemoveRange(db.AuditLogs.Where(a => a.ActorUserId == user.Id || a.ActorEmail == email));
         db.Users.Remove(user);
 
         await db.SaveChangesAsync();

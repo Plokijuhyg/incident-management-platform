@@ -36,3 +36,13 @@ Thumbs.db
 # === Logs ===
 *.log
 logs/
+# Python integration caches and private gateway state
+__pycache__/
+*.pyc
+integrations/hexstrike/state/
+*.p12
+*.pem
+
+# Local Sigma importer environment
+integrations/sigma/.venv/
+integrations/sigma/.venv312/

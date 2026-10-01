@@ -1,8 +1,8 @@
 # API Design
 
-> **Status:** DESIGN — agreed 2026-08-22. No endpoint is implemented yet.
-> This file is the contract for both the ASP.NET Core controllers and the Angular
-> `core/services`. Endpoints get marked ✅ as they are built and verified.
+> **Status:** Users management, audit writes, dashboard endpoints, rate limiting,
+> readiness and security headers implemented (2026-09-24).
+> Other sections retain their design requirements unless explicitly marked below.
 
 **Base URL:** `/api` · **Format:** JSON · **Auth:** `Authorization: Bearer <jwt>`
 · **Time:** all timestamps ISO 8601 UTC (`2026-08-22T14:03:11Z`)
@@ -164,8 +164,12 @@ rather than overwriting a concurrent edit.
 
 `POST /api/incidents/{id}/status` body: `{ "status": "CONTAINED", "note": "..." }`.
 Automatically writes a timeline event and sets the matching milestone timestamp —
-so the timeline can never drift from the status. Illegal transitions return `422`
-once the state machine is designed (Phase 8).
+so the timeline can never drift from the status. `Closed` is rejected with `400`:
+closing goes through `/close`, which is Manager/Admin only and requires a resolution
+summary. Reopening a closed incident is likewise Manager/Admin only (`403` otherwise)
+and clears `closedAt`. Assign, status and close return `409` if another request
+modified the incident concurrently. Other illegal transitions return `422` once the
+state machine is designed (Phase 8).
 
 ---
 
@@ -297,6 +301,43 @@ caching (Phase 27) — expensive aggregates, tolerant of a short TTL.
 
 ---
 
+### Implemented dashboard semantics
+
+All dashboard routes require authentication and have organization-wide visibility,
+matching the existing incident list. `myOpenIncidents` uses the authenticated user.
+Open excludes `Resolved`, `Closed`, and `FalsePositive`; unassigned counts only open incidents.
+Grouped responses use `{ label, count }`; MITRE ranking uses `{ techniqueId, name, count }`.
+
+Time series use UTC `CreatedAt`, include today, and fill missing buckets with zero.
+`days` is 1?365; `interval` is `day` or `week`. Weeks are consecutive seven-day
+buckets anchored at the start of the requested range (the last may be partial).
+Each item is `{ start, count }`. SQL performs grouping for both intervals.
+MITRE `limit` is 1?100 (default 10). Invalid bounds return 400.
+
+Metrics accept `periodDays=30` (1?365) and select incidents created during the
+rolling period. Durations are SQL averages in minutes:
+
+- MTTD: `DetectedAt - OccurredAt`. `OccurredAt` is an optional incident-create
+  field; when supplied it requires `DetectedAt >= OccurredAt`.
+- MTTC: `ContainedAt - DetectedAt`.
+- MTTR: `ResolvedAt - DetectedAt`.
+
+Unknown milestones and negative durations are excluded separately for each metric.
+An empty metric returns `null`, not zero. `sampleSize` counts incidents in the period;
+`detectionSampleSize`, `containmentSampleSize`, and `resolutionSampleSize` report
+actual contributing samples. Existing rows have unknown occurrence time and do not
+contribute to MTTD until that information exists; creation delay is not detection delay.
+
+The UI displays the period `sampleSize` and each metric's contributing sample count.
+A nonzero contributing sample smaller than five shows a small-sample caution; this is
+an explicit presentation threshold, not a statistical significance claim. The time series
+is a line chart with an accessible table of the same API values. Empty SQL buckets are
+zero-filled; no incident entities are loaded to count in memory. Integration tests capture
+executed MySQL commands and require SQL COUNT/GROUP BY for grouped results and AVG/COUNT
+for metrics (ungrouped headline totals use SQL COUNT directly).
+
+---
+
 ## 8. Audit logs — `/api/audit-logs`
 
 | Method | Route | Roles |
@@ -308,6 +349,23 @@ Filters: `actorUserId`, `action`, `entityType`, `outcome`, `from`, `to`,
 `ipAddress`. Read-only by design — no POST, PUT, or DELETE exists at any route.
 
 ---
+
+### Implemented audit writes
+
+HTTP mutations write entity action records (`INCIDENT_CREATED`, `INCIDENT_UPDATED`,
+`USERROLE_CREATED`, etc.) with generated entity IDs and field before/after values
+in the same SQL transaction as their data changes. Values outside an explicit
+allow-list are redacted; no passwords, tokens, raw payloads, file contents or storage
+paths are recorded. Role links use composite IDs (`userId:roleId`).
+
+Auth writes include `LOGIN_SUCCEEDED`, `TOKEN_REFRESHED`, `LOGOUT`, and
+`PASSWORD_CHANGED`. Failure capture includes `LOGIN_FAILED`, `ACCESS_DENIED`
+(outcome `Denied`), and `REQUEST_FAILED`, including rate-limit rejection.
+Failed login email is a claimed identity; the actor ID remains null.
+Evidence actions are `EVIDENCE_UPLOADED`, `EVIDENCE_DOWNLOADED`, and `EVIDENCE_DELETED`.
+Download is audited before streaming: the record means access was granted, not
+that the client received every byte. Failed requests use a separate database scope
+so pending business changes cannot be accidentally committed.
 
 ## 9. Rate limiting
 
@@ -323,6 +381,14 @@ endpoints and by user id once authenticated. Exceeding a limit returns `429` wit
 | `global` | Everything else | 300 / min per user |
 
 ---
+
+Policies are fixed-window, in-process ASP.NET Core limiters, shared across all
+routes within each policy for a user. Login email is trimmed and lowercased, then
+hashed for the IP+email partition. Login JSON is bounded to 16 KiB before parsing.
+Authenticated policies use the validated user ID; anonymous callers use the socket
+IP. Forwarding headers are not trusted automatically. Each request consumes its
+specific policy or the global policy. Health probes are exempt. Multi-instance
+deployment requires a shared/edge limiter to enforce cluster-wide budgets.
 
 ## 10. Health & docs
 
@@ -342,3 +408,38 @@ that enumerates your infrastructure is reconnaissance.
 Cursor pagination · bulk operations · webhooks · `PATCH`/JSON-Patch · API
 versioning (single client, `/api/v1` added only when a breaking change is real) ·
 GraphQL · SIEM ingestion endpoints · report export (PDF/CSV).
+
+### Operational deployment
+
+Apply `dotnet ef database update --project backend/IncidentPlatform.Api` before
+starting this version (migration `AddIncidentOccurredAt`, nullable column only).
+`/health` probes the process only. `/health/ready` probes MySQL with a five-second
+check timeout and returns 200/503 with only `Healthy`/`Unhealthy` text.
+
+Every API response gets CSP (`default-src 'none'`, no frames, base URI or forms),
+`nosniff`, `DENY`, `no-referrer`, restricted device permissions and `Cache-Control:
+no-store`. HTTPS redirection is enabled; HSTS is enabled outside Development.
+Kestrel's Server header is disabled. The API does not serve the Angular SPA; its
+hosting server needs its own browser-content policy.
+
+User administration supports list/create/read/update, soft deactivation, replacing
+roles, role reference data and slim active assignees. User creation and role links
+commit atomically. Existing access tokens re-check active status and current roles
+on every authenticated request; deactivation also revokes refresh tokens.
+An administrator cannot deactivate themselves or remove their own Admin role.
+
+
+### Workspace frontend completion (2026-09-25)
+
+- `GET /api/incidents/{id}/iocs|assets|mitre-techniques`: authenticated association lists,
+  returning catalog ID, name, reference, classification (role/impact), notes and added time.
+  Missing incidents return 404. Existing POST/DELETE association endpoints are unchanged.
+- `GET /api/audit-logs`: Admin only; page/pageSize (max 100), action substring,
+  entityType/entityId exact match and numeric outcome filters. Newest events first.
+- `GET /api/audit-logs/entity/{entityType}/{entityId}`: Admin or Security Manager; paginated.
+- `GET /api/lab/connections`: Admin only; server-configured HexStrike/Ollama URLs.
+- `POST /api/lab/connections/{hexstrike|ollama}/check`: Admin only; bounded health response,
+  five-second timeout, literal loopback/RFC1918 destination only, no redirects or system proxy.
+  Returns reachability, explanatory message and check timestamp; no scan/model execution.
+- IncidentSource now includes PenTest (numeric 8), preserving existing enum values and allowing
+  promotion of AlertSource.PenTest (numeric 6).

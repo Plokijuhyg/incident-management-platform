@@ -25,4 +25,7 @@
     <ProjectReference Include="..\IncidentPlatform.Api\IncidentPlatform.Api.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Fixtures/sigma-conditions.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

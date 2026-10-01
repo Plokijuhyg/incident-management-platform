@@ -10,11 +10,11 @@ using Xunit;
 
 namespace IncidentPlatform.Tests;
 
-public class AuthControllerTests : IClassFixture<WebApplicationFactory<Program>>
+public class AuthControllerTests : IClassFixture<TestApiFactory>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly TestApiFactory _factory;
 
-    public AuthControllerTests(WebApplicationFactory<Program> factory)
+    public AuthControllerTests(TestApiFactory factory)
     {
         _factory = factory;
     }
@@ -64,6 +64,7 @@ public class AuthControllerTests : IClassFixture<WebApplicationFactory<Program>>
         var tokens = dbContext.RefreshTokens.Where(t => t.UserId == user.Id);
         dbContext.RefreshTokens.RemoveRange(tokens);
 
+        dbContext.AuditLogs.RemoveRange(dbContext.AuditLogs.Where(a => a.ActorUserId == user.Id || a.ActorEmail == email));
         dbContext.Users.Remove(user);
         await dbContext.SaveChangesAsync();
     }

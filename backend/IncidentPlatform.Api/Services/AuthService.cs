@@ -21,17 +21,19 @@ public class AuthService : IAuthService
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtService _jwtService;
     private readonly JwtSettings _jwtSettings;
+    private readonly IAuditContext? _audit;
 
     public AuthService(
         AppDbContext dbContext,
         IPasswordHasher passwordHasher,
         IJwtService jwtService,
-        IOptions<JwtSettings> jwtSettings)
+        IOptions<JwtSettings> jwtSettings, IAuditContext? audit = null)
     {
         _dbContext = dbContext;
         _passwordHasher = passwordHasher;
         _jwtService = jwtService;
         _jwtSettings = jwtSettings.Value;
+        _audit = audit;
     }
 
     public async Task<AuthResult> LoginAsync(LoginRequest request, string ipAddress, CancellationToken cancellationToken = default)
@@ -74,6 +76,7 @@ public class AuthService : IAuthService
 
         var (refreshTokenEntity, rawRefreshToken) = GenerateRefreshToken(user, ipAddress);
         _dbContext.RefreshTokens.Add(refreshTokenEntity);
+        AddAudit("LOGIN_SUCCEEDED", user);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
@@ -105,7 +108,7 @@ public class AuthService : IAuthService
             throw new AuthenticationFailedException();
         }
 
-        if (token.IsExpired)
+        if (!token.User.IsActive || token.IsExpired)
         {
             throw new AuthenticationFailedException();
         }
@@ -117,6 +120,7 @@ public class AuthService : IAuthService
         token.RevokedByIp = ipAddress;
         token.ReasonRevoked = "Rotated";
         token.ReplacedByTokenHash = newTokenEntity.TokenHash;
+        AddAudit("TOKEN_REFRESHED", token.User);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
@@ -138,6 +142,8 @@ public class AuthService : IAuthService
             token.RevokedAt = DateTime.UtcNow;
             token.RevokedByIp = ipAddress;
             token.ReasonRevoked = "Logged out";
+            var user = await _dbContext.Users.SingleAsync(u => u.Id == token.UserId, cancellationToken);
+            AddAudit("LOGOUT", user);
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
     }
@@ -156,6 +162,7 @@ public class AuthService : IAuthService
             throw new ValidationAppException("Current password is incorrect.");
         }
 
+        AddAudit("PASSWORD_CHANGED", user);
         user.PasswordHash = _passwordHasher.Hash(request.NewPassword);
         user.UpdatedAt = DateTime.UtcNow;
 
@@ -205,6 +212,14 @@ public class AuthService : IAuthService
         };
 
         return (entity, rawToken);
+    }
+
+    private void AddAudit(string action, User user)
+    {
+        if (_audit?.IsActive != true) return;
+        _audit.ActorUserId = user.Id;
+        _audit.ActorEmail = user.Email;
+        _dbContext.AuditLogs.Add(_audit.Create(action, "User", user.Id.ToString()));
     }
 
     private static string HashToken(string rawToken)

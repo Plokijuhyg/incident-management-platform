@@ -10,6 +10,8 @@ public class AlertConfiguration : IEntityTypeConfiguration<Alert>
     {
         builder.ToTable("Alerts");
 
+        builder.Property(x => x.EnrichmentJson).HasColumnType("json");
+
         builder.HasKey(a => a.Id);
 
         builder.Property(a => a.Title).HasMaxLength(200).IsRequired();

@@ -11,11 +11,11 @@ using Xunit;
 
 namespace IncidentPlatform.Tests;
 
-public class MeAndChangePasswordTests : IClassFixture<WebApplicationFactory<Program>>
+public class MeAndChangePasswordTests : IClassFixture<TestApiFactory>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly TestApiFactory _factory;
 
-    public MeAndChangePasswordTests(WebApplicationFactory<Program> factory)
+    public MeAndChangePasswordTests(TestApiFactory factory)
     {
         _factory = factory;
     }
@@ -52,6 +52,7 @@ public class MeAndChangePasswordTests : IClassFixture<WebApplicationFactory<Prog
         {
             var tokens = dbContext.RefreshTokens.Where(t => t.UserId == user.Id);
             dbContext.RefreshTokens.RemoveRange(tokens);
+            dbContext.AuditLogs.RemoveRange(dbContext.AuditLogs.Where(a => a.ActorUserId == user.Id || a.ActorEmail == email));
             dbContext.Users.Remove(user);
             await dbContext.SaveChangesAsync();
         }

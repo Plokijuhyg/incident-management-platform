@@ -13,12 +13,12 @@ using Xunit;
 
 namespace IncidentPlatform.Tests;
 
-public class AssetsControllerTests : IClassFixture<WebApplicationFactory<Program>>
+public class AssetsControllerTests : IClassFixture<TestApiFactory>
 {
-    private readonly WebApplicationFactory<Program> _factory;
-    private string? hostname;
+    private readonly TestApiFactory _factory;
 
-    public AssetsControllerTests(WebApplicationFactory<Program> factory)
+
+    public AssetsControllerTests(TestApiFactory factory)
     {
         _factory = factory;
     }
@@ -61,9 +61,11 @@ public class AssetsControllerTests : IClassFixture<WebApplicationFactory<Program
             db.Assets.RemoveRange(db.Assets.Where(a => a.Hostname != null && a.Hostname.StartsWith(assetHostnamePrefix)));
         }
 
+        db.Assets.RemoveRange(db.Assets.Where(a => db.AuditLogs.Any(log => log.ActorUserId == user.Id && log.EntityType == "Asset" && log.EntityId == a.Id.ToString() && log.Action == "ASSET_CREATED")));
         db.Incidents.RemoveRange(db.Incidents.Where(i => i.CreatedById == user.Id || i.AssignedToId == user.Id));
         db.RefreshTokens.RemoveRange(db.RefreshTokens.Where(t => t.UserId == user.Id));
         db.UserRoles.RemoveRange(db.UserRoles.Where(ur => ur.UserId == user.Id));
+        db.AuditLogs.RemoveRange(db.AuditLogs.Where(a => a.ActorUserId == user.Id || a.ActorEmail == email));
         db.Users.Remove(user);
         await db.SaveChangesAsync();
     }
@@ -103,11 +105,12 @@ public class AssetsControllerTests : IClassFixture<WebApplicationFactory<Program
     public async Task Create_AsManager_ThenGetById_ReturnsIt()
     {
         var email = await CreateUserAsync(RoleNames.SecurityManager);
+        string? hostname = null;
         try
         {
             var client = await AuthenticatedClientAsync(email);
 
-            var hostname = $"db-srv-{Guid.NewGuid():N}.corp.local";
+            hostname = $"db-srv-{Guid.NewGuid():N}.corp.local";
 
             HttpResponseMessage httpResponseMessage1 = await client.PostAsJsonAsync("/api/assets", new AssetCreateRequest
             {
@@ -135,11 +138,12 @@ public class AssetsControllerTests : IClassFixture<WebApplicationFactory<Program
     public async Task Create_DuplicateHostname_Returns409()
     {
         var email = await CreateUserAsync(RoleNames.SecurityManager);
+        string? hostname = null;
         try
         {
             var client = await AuthenticatedClientAsync(email);
 
-            var hostname = $"dup-{Guid.NewGuid():N}.corp.local";
+            hostname = $"dup-{Guid.NewGuid():N}.corp.local";
 
             await client.PostAsJsonAsync("/api/assets", new AssetCreateRequest
             {

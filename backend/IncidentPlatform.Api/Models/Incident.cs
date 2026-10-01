@@ -57,7 +57,9 @@ public enum IncidentSource
     EmailSecurity,
     Manual,
     UserReport,
-    ThreatIntel
+    ThreatIntel,
+    PenTest,
+    WindowsEvent
 }
 
 /// <summary>
@@ -72,6 +74,7 @@ public enum IncidentSource
 /// </summary>
 public class Incident
 {
+    public string? EnrichmentJson { get; set; }
     public int Id { get; set; }
     public string IncidentNumber { get; set; } = string.Empty; // "INC-2026-000042"
     public string Title { get; set; } = string.Empty;
@@ -92,6 +95,7 @@ public class Incident
     // DetectedAt vs CreatedAt is a real distinction, not redundancy: a
     // SIEM rule can detect activity hours before a human creates the
     // record. MTTD is meaningless if these are conflated.
+    public DateTime? OccurredAt { get; set; }
     public DateTime? DetectedAt { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }

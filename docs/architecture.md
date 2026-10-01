@@ -1,9 +1,9 @@
 # Architecture
 
-> **Status:** DESIGN — agreed 2026-08-22. Project structure (§3, §6) is scaffolded
-> and building; everything else is still design only.
-> Each section is marked ✅ implemented / 🚧 in progress / 📋 planned as the build proceeds.
-> This file must be updated whenever the real architecture diverges from it.
+> **Status:** Backend operational controls implemented (2026-09-24): user management,
+> transactional audit writes, SQL dashboard aggregation, rate limiting, readiness
+> and security headers. Remaining planned features are noted in their sections.
+> Update this file whenever the real architecture diverges from it.
 
 ---
 
@@ -137,22 +137,31 @@ backend/
 
 ## 4. Middleware pipeline order
 
-Order is behaviour, not preference. A misordered pipeline produces real security
-bugs — e.g. rate limiting placed after authentication lets unauthenticated
-attackers exhaust CPU on token validation.
+Implemented pipeline (2026-09-24):
 
-```
-1. Global exception handler      catch everything below it → ProblemDetails
-2. Request/correlation logging   assign correlation id, log method/path/status/duration
-3. HTTPS redirection + HSTS
-4. Security headers              CSP, X-Content-Type-Options, Referrer-Policy…
-5. CORS                          must precede auth so preflight isn't rejected
-6. Rate limiting                 cheap rejection before expensive work
-7. Authentication                who are you? (validate JWT, populate principal)
-8. Authorization                 may you? (policies, roles)
-9. Audit capture                 record the authenticated, authorized action
-10. Controllers
-```
+1. Security headers (registered on response start, including error responses).
+2. Request logging and outer exception handler.
+3. HTTPS redirection and HSTS outside Development.
+4. Routing and CORS.
+5. JWT authentication, with active-user/current-role verification against MySQL.
+6. Audit failure capture, surrounding an inner exception handler.
+7. Bounded login-identity extraction (16 KiB, rewound for MVC).
+8. Built-in partitioned rate limiter, then authorization and controllers.
+
+Authentication precedes user-based limiting so partitions use a validated user ID,
+as required by the [ASP.NET Core rate limiter guidance](https://learn.microsoft.com/en-us/aspnet/core/performance/rate-limit-samples?view=aspnetcore-10.0).
+Anonymous login limiting still precedes password hashing and controller work.
+Socket IP is used unless trusted proxy forwarding is explicitly configured later.
+
+Mutation auditing wraps SaveChangesAsync in a transaction (or savepoint inside an
+existing transaction), saving generated entity IDs without allowing unaudited data
+to commit. A request-local IAuditContext carries identity and transport metadata;
+services do not depend on HTTP types. Failure auditing uses a fresh context after
+exception translation so failed service state cannot leak into the database.
+
+Readiness uses a tagged database health check, while liveness excludes dependencies.
+The MySQL provider uses an explicit MySQL 8 server version, avoiding a connection
+just to resolve DbContext options. Startup seeding still requires MySQL.
 
 ---
 
@@ -206,6 +215,35 @@ frontend/src/app/
   `api-design.md` is the single source of truth for both sides.
 
 ---
+
+### Implemented frontend slice (2026-09-24)
+
+Login, guarded shell, incident list/detail/create/actions, evidence, user administration,
+and dashboard pages now consume the API.
+The workspace explicitly enables zoneless change detection and strict templates.
+Feature routes are lazy; numeric enum options match the current C# wire format.
+The list uses real server pagination; search/filter controls await backend support.
+
+Access tokens remain in memory. Concurrent route guards share one refresh-cookie
+request on reload. API 401 responses clear the session and return to login without
+replaying mutations. The interceptor attaches JWTs only to same-origin `/api/`
+requests. Logout waits for cookie revocation before clearing local session state.
+Route guards are UX controls; the server owns authorization.
+
+Dates from the API are UTC (including unsuffixed MySQL datetime values); forms
+convert local datetime input to UTC. Detail renders user text through interpolation.
+Incident edits submit the current version. A conflict preserves the draft and requires an
+explicit reload; assignment, status and closure use their separate endpoints. Evidence uses
+multipart uploads and JWT-authenticated Blob downloads. Destructive actions have inline
+confirmation. User administration has an additional Admin guard, with role-aware navigation.
+
+The dashboard aggregates eight API reads, with cancellation when the selected period changes.
+Native HTML/CSS charts expose counts and a trend table without a charting dependency. Null
+response metrics remain unavailable rather than becoming zero; each metric shows its sample
+count. Workspace totals and rankings are all-time, while trend/metrics selectors affect only
+their respective requests.
+
+See `frontend/README.md` for proxy setup, production hosting and verification.
 
 ## 7. What is deliberately deferred
 

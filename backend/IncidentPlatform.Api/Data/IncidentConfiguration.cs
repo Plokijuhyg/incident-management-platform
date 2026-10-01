@@ -10,6 +10,8 @@ public class IncidentConfiguration : IEntityTypeConfiguration<Incident>
     {
         builder.ToTable("Incidents");
 
+        builder.Property(x => x.EnrichmentJson).HasColumnType("json");
+
         builder.HasKey(i => i.Id);
 
         builder.Property(i => i.IncidentNumber).HasMaxLength(20).IsRequired();
@@ -24,6 +26,7 @@ public class IncidentConfiguration : IEntityTypeConfiguration<Incident>
         builder.Property(i => i.Category).HasConversion<string>().HasMaxLength(30).IsRequired();
         builder.Property(i => i.Source).HasConversion<string>().HasMaxLength(20).IsRequired();
 
+        builder.Property(i => i.OccurredAt).HasColumnType("datetime(6)");
         builder.Property(i => i.DetectedAt).HasColumnType("datetime(6)");
         builder.Property(i => i.CreatedAt).HasColumnType("datetime(6)");
         builder.Property(i => i.UpdatedAt).HasColumnType("datetime(6)");

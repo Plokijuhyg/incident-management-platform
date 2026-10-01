@@ -81,7 +81,9 @@ public class AlertService : IAlertService
 
     public async Task<IncidentDetailResponse> PromoteAsync(int id, PromoteAlertRequest request, CancellationToken cancellationToken = default)
     {
-        var alert = await FindOrThrowAsync(id, cancellationToken);
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var alert = await _dbContext.Alerts.FromSqlInterpolated($"SELECT * FROM Alerts WHERE Id={id} FOR UPDATE").SingleOrDefaultAsync(cancellationToken)
+            ?? throw new NotFoundException("Alert", id);
 
         if (alert.Status is AlertStatus.Promoted or AlertStatus.FalsePositive or AlertStatus.Closed)
         {
@@ -91,7 +93,6 @@ public class AlertService : IAlertService
         // One transaction: create incident (race-safe numbering), link the
         // alert, mark it Promoted, write the ALERT_RECEIVED timeline event
         // — all or nothing (api-design.md §5).
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
         var incidentNumber = await IncidentNumberGenerator.GenerateNextAsync(_dbContext, cancellationToken);
 
@@ -102,6 +103,7 @@ public class AlertService : IAlertService
 
         var incident = new Incident
         {
+            EnrichmentJson = alert.EnrichmentJson,
             IncidentNumber = incidentNumber,
             Title = request.Title,
             Description = alert.Description ?? alert.Title,
@@ -119,6 +121,8 @@ public class AlertService : IAlertService
 
         _dbContext.Incidents.Add(incident);
         await _dbContext.SaveChangesAsync(cancellationToken); // generates incident.Id
+
+        await SigmaIncidentReferences.CopyAsync(_dbContext, alert, incident.Id, _currentUser.Id, cancellationToken);
 
         alert.IncidentId = incident.Id;
         alert.Status = AlertStatus.Promoted;
@@ -147,7 +151,9 @@ public class AlertService : IAlertService
 
     public async Task<AlertDetailResponse> MarkFalsePositiveAsync(int id, FalsePositiveRequest request, CancellationToken cancellationToken = default)
     {
-        var alert = await FindOrThrowAsync(id, cancellationToken);
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var alert = await _dbContext.Alerts.FromSqlInterpolated($"SELECT * FROM Alerts WHERE Id={id} FOR UPDATE").SingleOrDefaultAsync(cancellationToken)
+            ?? throw new NotFoundException("Alert", id);
 
         if (alert.Status is AlertStatus.Promoted)
         {
@@ -163,6 +169,7 @@ public class AlertService : IAlertService
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
+        await transaction.CommitAsync(cancellationToken);
         return ToDetailResponse(alert);
     }
 
@@ -174,6 +181,7 @@ public class AlertService : IAlertService
 
     private static AlertDetailResponse ToDetailResponse(Alert a) => new()
     {
+        RecommendedAction = ResponseRecommendations.For(a),
         Id = a.Id,
         Title = a.Title,
         Description = a.Description,

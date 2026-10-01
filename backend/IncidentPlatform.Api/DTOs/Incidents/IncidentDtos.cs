@@ -20,8 +20,11 @@ public class IncidentSummaryResponse
     public DateTime CreatedAt { get; set; }
 }
 
+public sealed record RecommendedResponse(int AlertId, string? RuleId, string Text);
+
 public class IncidentDetailResponse
 {
+    public List<RecommendedResponse> RecommendedActions { get; set; } = [];
     public int Id { get; set; }
     public string IncidentNumber { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
@@ -35,6 +38,7 @@ public class IncidentDetailResponse
     public string CreatedByName { get; set; } = string.Empty;
     public int? AssignedToId { get; set; }
     public string? AssignedToName { get; set; }
+    public DateTime? OccurredAt { get; set; }
     public DateTime? DetectedAt { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
@@ -54,6 +58,7 @@ public class IncidentCreateRequest
     public IncidentPriority Priority { get; set; }
     public IncidentCategory Category { get; set; }
     public IncidentSource Source { get; set; }
+    public DateTime? OccurredAt { get; set; }
     public DateTime? DetectedAt { get; set; }
 }
 

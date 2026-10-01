@@ -1,0 +1,11 @@
+{
+  "name": "incident-management-platform-workspace",
+  "private": true,
+  "scripts": {
+    "start": "npm --prefix frontend start",
+    "start:api": "dotnet run --project backend/IncidentPlatform.Api --launch-profile https",
+    "build": "npm --prefix frontend run build",
+    "test:ui": "npm --prefix frontend test -- --watch=false",
+    "test:api": "dotnet test backend/IncidentPlatform.Tests"
+  }
+}

@@ -9,11 +9,11 @@ using Xunit;
 
 namespace IncidentPlatform.Tests;
 
-public class ExceptionHandlerTests : IClassFixture<WebApplicationFactory<Program>>
+public class ExceptionHandlerTests : IClassFixture<TestApiFactory>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly TestApiFactory _factory;
 
-    public ExceptionHandlerTests(WebApplicationFactory<Program> factory)
+    public ExceptionHandlerTests(TestApiFactory factory)
     {
         _factory = factory;
     }

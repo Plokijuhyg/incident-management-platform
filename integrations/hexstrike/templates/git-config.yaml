@@ -1,0 +1,19 @@
+id: incident-git-config
+info:
+  name: Publicly readable Git repository configuration
+  author: incident-platform
+  severity: medium
+  description: A GET request returned Git configuration markers. Review exposure and restrict access.
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/.git/config"
+    redirects: false
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: word
+        part: body
+        condition: and
+        words: ["[core]", "repositoryformatversion"]

@@ -1,5 +1,6 @@
 using FluentValidation;
 using IncidentPlatform.Api.DTOs.Incidents;
+using IncidentPlatform.Api.Models;
 
 namespace IncidentPlatform.Api.Validators;
 
@@ -13,6 +14,9 @@ public class IncidentCreateRequestValidator : AbstractValidator<IncidentCreateRe
         RuleFor(x => x.Priority).IsInEnum();
         RuleFor(x => x.Category).IsInEnum();
         RuleFor(x => x.Source).IsInEnum();
+        RuleFor(x => x.OccurredAt).Must((request, occurred) => occurred is null ||
+            (request.DetectedAt is not null && occurred <= request.DetectedAt))
+            .WithMessage("OccurredAt requires DetectedAt and cannot be later than detection.");
     }
 }
 
@@ -40,7 +44,9 @@ public class ChangeStatusRequestValidator : AbstractValidator<ChangeStatusReques
 {
     public ChangeStatusRequestValidator()
     {
-        RuleFor(x => x.Status).IsInEnum();
+        RuleFor(x => x.Status).IsInEnum()
+            .NotEqual(IncidentStatus.Closed)
+            .WithMessage("Use the close endpoint to close an incident; it requires a resolution summary.");
     }
 }
 

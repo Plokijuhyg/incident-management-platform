@@ -20,6 +20,7 @@ public static class IncidentMapper
         CreatedByName = i.CreatedBy?.FullName ?? string.Empty,
         AssignedToId = i.AssignedToId,
         AssignedToName = i.AssignedTo?.FullName,
+        OccurredAt = i.OccurredAt,
         DetectedAt = i.DetectedAt,
         CreatedAt = i.CreatedAt,
         UpdatedAt = i.UpdatedAt,

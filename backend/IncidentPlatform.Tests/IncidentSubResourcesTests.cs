@@ -13,11 +13,11 @@ using Xunit;
 
 namespace IncidentPlatform.Tests;
 
-public class IncidentSubResourcesTests : IClassFixture<WebApplicationFactory<Program>>
+public class IncidentSubResourcesTests : IClassFixture<TestApiFactory>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly TestApiFactory _factory;
 
-    public IncidentSubResourcesTests(WebApplicationFactory<Program> factory)
+    public IncidentSubResourcesTests(TestApiFactory factory)
     {
         _factory = factory;
     }
@@ -59,6 +59,7 @@ public class IncidentSubResourcesTests : IClassFixture<WebApplicationFactory<Pro
             db.Incidents.RemoveRange(db.Incidents.Where(i => i.CreatedById == user.Id || i.AssignedToId == user.Id));
             db.RefreshTokens.RemoveRange(db.RefreshTokens.Where(t => t.UserId == user.Id));
             db.UserRoles.RemoveRange(db.UserRoles.Where(ur => ur.UserId == user.Id));
+            db.AuditLogs.RemoveRange(db.AuditLogs.Where(a => a.ActorUserId == user.Id || a.ActorEmail == email));
             db.Users.Remove(user);
             await db.SaveChangesAsync();
         }

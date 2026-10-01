@@ -33,6 +33,7 @@ public class AssetService : IAssetService
             .Select(a => ToResponse(a))
             .ToListAsync(cancellationToken);
 
+        await EnrichSources(items,cancellationToken);
         return new PagedResult<AssetResponse> { Items = items, Page = page, PageSize = pageSize, TotalCount = totalCount };
     }
 
@@ -55,8 +56,10 @@ public class AssetService : IAssetService
             .ToListAsync(cancellationToken);
 
         var response = ToResponse(asset);
+        await EnrichSources([response],cancellationToken);
         return new AssetDetailResponse
         {
+            LogEventCount=response.LogEventCount,LastEventAt=response.LastEventAt,CollectionStatus=response.CollectionStatus,
             Id = response.Id,
             Name = response.Name,
             Hostname = response.Hostname,
@@ -166,6 +169,13 @@ public class AssetService : IAssetService
 
         _dbContext.IncidentAssets.Remove(link);
         await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task EnrichSources(List<AssetResponse> rows,CancellationToken ct)
+    {
+        var names=rows.Select(a=>a.Hostname??a.Name).ToArray();
+        var stats=await _dbContext.WindowsEvents.Where(e=>names.Contains(e.Machine)).GroupBy(e=>e.Machine).Select(g=>new{Machine=g.Key,Count=g.Count(),Last=g.Max(e=>e.ReceivedAt)}).ToListAsync(ct);
+        foreach(var row in rows){var s=stats.FirstOrDefault(s=>string.Equals(s.Machine,row.Hostname??row.Name,StringComparison.OrdinalIgnoreCase));if(s is null)continue;row.LogEventCount=s.Count;row.LastEventAt=s.Last;row.CollectionStatus=s.Last>DateTime.UtcNow.AddMinutes(-15)?"Logs received recently":"Stored logs; no recent events";}
     }
 
     private static AssetResponse ToResponse(Asset a) => new()

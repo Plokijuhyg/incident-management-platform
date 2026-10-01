@@ -15,6 +15,7 @@ public class AlertSummaryResponse
 
 public class AlertDetailResponse
 {
+    public string? RecommendedAction { get; set; }
     public int Id { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }

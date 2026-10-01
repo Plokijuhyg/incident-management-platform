@@ -9,11 +9,11 @@ namespace IncidentPlatform.Tests;
 /// authorization tests in docs/security.md §11 will use: host the real
 /// application in memory, then assert on genuine HTTP responses.
 /// </summary>
-public class HealthEndpointTests : IClassFixture<WebApplicationFactory<Program>>
+public class HealthEndpointTests : IClassFixture<TestApiFactory>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly TestApiFactory _factory;
 
-    public HealthEndpointTests(WebApplicationFactory<Program> factory) => _factory = factory;
+    public HealthEndpointTests(TestApiFactory factory) => _factory = factory;
 
     [Fact]
     public async Task Health_endpoint_returns_ok_when_the_application_is_running()

@@ -1,0 +1,340 @@
+[
+  {
+    "name": "contains",
+    "compiled": {
+      "op": "or",
+      "args": [
+        {
+          "op": "field",
+          "field": "TargetUserName",
+          "value": {
+            "kind": "string",
+            "parts": [
+              {
+                "wildcard": "*"
+              },
+              {
+                "text": "admin"
+              },
+              {
+                "wildcard": "*"
+              }
+            ],
+            "cased": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "wildcard",
+    "compiled": {
+      "op": "or",
+      "args": [
+        {
+          "op": "field",
+          "field": "TargetUserName",
+          "value": {
+            "kind": "string",
+            "parts": [
+              {
+                "text": "a"
+              },
+              {
+                "wildcard": "?"
+              },
+              {
+                "text": "min"
+              },
+              {
+                "wildcard": "*"
+              }
+            ],
+            "cased": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "case",
+    "compiled": {
+      "op": "or",
+      "args": [
+        {
+          "op": "field",
+          "field": "TargetUserName",
+          "value": {
+            "kind": "string",
+            "parts": [
+              {
+                "text": "ADMIN"
+              }
+            ],
+            "cased": true
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "numeric",
+    "compiled": {
+      "op": "or",
+      "args": [
+        {
+          "op": "field",
+          "field": "EventID",
+          "value": {
+            "kind": "compare",
+            "value": 4600,
+            "operator": "GTE"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "null",
+    "compiled": {
+      "op": "or",
+      "args": [
+        {
+          "op": "field",
+          "field": "Missing",
+          "value": {
+            "kind": "null"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "exists",
+    "compiled": {
+      "op": "or",
+      "args": [
+        {
+          "op": "field",
+          "field": "Missing",
+          "value": {
+            "kind": "exists",
+            "value": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "cidr",
+    "compiled": {
+      "op": "or",
+      "args": [
+        {
+          "op": "field",
+          "field": "IpAddress",
+          "value": {
+            "kind": "cidr",
+            "value": "192.168.207.0/24"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "fieldref",
+    "compiled": {
+      "op": "or",
+      "args": [
+        {
+          "op": "field",
+          "field": "TargetUserName",
+          "value": {
+            "kind": "field",
+            "field": "SubjectUserName",
+            "startsWith": false,
+            "endsWith": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "regex",
+    "compiled": {
+      "op": "or",
+      "args": [
+        {
+          "op": "field",
+          "field": "TargetUserName",
+          "value": {
+            "kind": "regex",
+            "pattern": "^admin[0-9]+$",
+            "flags": "i"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "all",
+    "compiled": {
+      "op": "or",
+      "args": [
+        {
+          "op": "and",
+          "args": [
+            {
+              "op": "field",
+              "field": "TargetUserName",
+              "value": {
+                "kind": "string",
+                "parts": [
+                  {
+                    "wildcard": "*"
+                  },
+                  {
+                    "text": "admin"
+                  },
+                  {
+                    "wildcard": "*"
+                  }
+                ],
+                "cased": false
+              }
+            },
+            {
+              "op": "field",
+              "field": "TargetUserName",
+              "value": {
+                "kind": "string",
+                "parts": [
+                  {
+                    "wildcard": "*"
+                  },
+                  {
+                    "text": "1"
+                  },
+                  {
+                    "wildcard": "*"
+                  }
+                ],
+                "cased": false
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "not",
+    "compiled": {
+      "op": "or",
+      "args": [
+        {
+          "op": "and",
+          "args": [
+            {
+              "op": "field",
+              "field": "TargetUserName",
+              "value": {
+                "kind": "string",
+                "parts": [
+                  {
+                    "wildcard": "*"
+                  },
+                  {
+                    "text": "admin"
+                  },
+                  {
+                    "wildcard": "*"
+                  }
+                ],
+                "cased": false
+              }
+            },
+            {
+              "op": "not",
+              "args": [
+                {
+                  "op": "field",
+                  "field": "TargetUserName",
+                  "value": {
+                    "kind": "string",
+                    "parts": [
+                      {
+                        "text": "excluded"
+                      }
+                    ],
+                    "cased": false
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "oneof",
+    "compiled": {
+      "op": "or",
+      "args": [
+        {
+          "op": "or",
+          "args": [
+            {
+              "op": "field",
+              "field": "TargetUserName",
+              "value": {
+                "kind": "string",
+                "parts": [
+                  {
+                    "text": "admin1"
+                  }
+                ],
+                "cased": false
+              }
+            },
+            {
+              "op": "field",
+              "field": "TargetUserName",
+              "value": {
+                "kind": "string",
+                "parts": [
+                  {
+                    "text": "someone"
+                  }
+                ],
+                "cased": false
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "base64",
+    "compiled": {
+      "op": "or",
+      "args": [
+        {
+          "op": "field",
+          "field": "Encoded",
+          "value": {
+            "kind": "string",
+            "parts": [
+              {
+                "text": "aGVsbG8="
+              }
+            ],
+            "cased": false
+          }
+        }
+      ]
+    }
+  }
+]

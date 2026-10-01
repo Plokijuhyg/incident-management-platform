@@ -558,3 +558,10 @@ Dependency-ordered, so each migration applies cleanly:
 6. Incident children: `IncidentTimelineEvents`, `IncidentComments`,
    `ResponseActions`, `Evidence`
 7. `AuditLogs`
+
+## Operational metrics addition (2026-09-24)
+
+`Incidents.OccurredAt` is nullable `datetime(6)` UTC, added by migration
+`AddIncidentOccurredAt`. It records known incident onset for actual MTTD
+(`DetectedAt - OccurredAt`). It is not inferred or backfilled from `CreatedAt`.
+Unknown onset is excluded from MTTD; each metric returns its own sample count.

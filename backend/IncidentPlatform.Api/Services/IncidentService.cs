@@ -60,7 +60,10 @@ public class IncidentService : IIncidentService
     public async Task<IncidentDetailResponse> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         var incident = await FindIncidentOrThrowAsync(id, cancellationToken);
-        return IncidentMapper.ToDetailResponse(incident);
+        var response = IncidentMapper.ToDetailResponse(incident);
+        var alerts = await _dbContext.Alerts.AsNoTracking().Where(a=>a.IncidentId==id).ToListAsync(cancellationToken);
+        response.RecommendedActions = alerts.Select(a=>(a, text:ResponseRecommendations.For(a))).Where(x=>x.text is not null).Select(x=>new RecommendedResponse(x.a.Id,x.a.SourceRuleId,x.text!)).ToList();
+        return response;
     }
 
     public async Task<IncidentDetailResponse> CreateAsync(IncidentCreateRequest request, CancellationToken cancellationToken = default)
@@ -80,6 +83,7 @@ public class IncidentService : IIncidentService
             Category = request.Category,
             Source = request.Source,
             CreatedById = _currentUser.Id,
+            OccurredAt = request.OccurredAt,
             DetectedAt = request.DetectedAt,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
@@ -136,7 +140,7 @@ public class IncidentService : IIncidentService
         await AddTimelineEventAsync(incident.Id, TimelineEventType.Assignment,
             "Incident assigned", $"Assigned to user {request.AssignedToId}", cancellationToken);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await SaveWithConcurrencyCheckAsync(cancellationToken);
         await _dbContext.Entry(incident).Reference(i => i.AssignedTo).LoadAsync(cancellationToken);
 
         return IncidentMapper.ToDetailResponse(incident);
@@ -148,8 +152,20 @@ public class IncidentService : IIncidentService
 
         EnforceModifyPermission(incident);
 
+        // Closing goes through CloseAsync (manager/admin, resolution summary required),
+        // so reopening a closed incident is held to the same roles.
+        if (incident.Status == IncidentStatus.Closed && request.Status != IncidentStatus.Closed &&
+            !_currentUser.IsInRole(RoleNames.Admin) && !_currentUser.IsInRole(RoleNames.SecurityManager))
+        {
+            throw new ForbiddenException("Only managers and admins can reopen a closed incident.");
+        }
+
         var previousStatus = incident.Status;
         incident.Status = request.Status;
+        if (previousStatus == IncidentStatus.Closed && request.Status != IncidentStatus.Closed)
+        {
+            incident.ClosedAt = null;
+        }
         incident.UpdatedAt = DateTime.UtcNow;
         incident.Version++;
 
@@ -170,7 +186,7 @@ public class IncidentService : IIncidentService
         await AddTimelineEventAsync(incident.Id, TimelineEventType.StatusChange,
             $"Status changed: {previousStatus} → {request.Status}", request.Note, cancellationToken);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await SaveWithConcurrencyCheckAsync(cancellationToken);
 
         return IncidentMapper.ToDetailResponse(incident);
     }
@@ -188,7 +204,7 @@ public class IncidentService : IIncidentService
         await AddTimelineEventAsync(incident.Id, TimelineEventType.Resolution,
             "Incident closed", request.ResolutionSummary, cancellationToken);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await SaveWithConcurrencyCheckAsync(cancellationToken);
 
         return IncidentMapper.ToDetailResponse(incident);
     }

@@ -3,11 +3,22 @@ using Microsoft.EntityFrameworkCore;
 
 namespace IncidentPlatform.Api.Data;
 
-public class AppDbContext : DbContext
+public partial class AppDbContext : DbContext
 {
-    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
+    private readonly IncidentPlatform.Api.Interfaces.IAuditContext? _audit;
+
+    public AppDbContext(DbContextOptions<AppDbContext> options, IncidentPlatform.Api.Interfaces.IAuditContext? audit = null) : base(options)
     {
+        _audit = audit;
     }
+
+    public DbSet<IncidentNotification> IncidentNotifications => Set<IncidentNotification>();
+    public DbSet<DetectionRule> DetectionRules => Set<DetectionRule>();
+    public DbSet<AutomationRule> AutomationRules => Set<AutomationRule>();
+    public DbSet<AutomationDecision> AutomationDecisions => Set<AutomationDecision>();
+    public DbSet<SecurityAssessment> SecurityAssessments => Set<SecurityAssessment>();
+    public DbSet<WindowsEvent> WindowsEvents => Set<WindowsEvent>();
+    public DbSet<WindowsEventCheckpoint> WindowsEventCheckpoints => Set<WindowsEventCheckpoint>();
 
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<User> Users => Set<User>();
@@ -31,6 +42,13 @@ public class AppDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.ApplyConfiguration(new IncidentNotificationConfiguration());
+        modelBuilder.ApplyConfiguration(new DetectionRuleConfiguration());
+        modelBuilder.ApplyConfiguration(new AutomationRuleConfiguration());
+        modelBuilder.ApplyConfiguration(new AutomationDecisionConfiguration());
+        modelBuilder.ApplyConfiguration(new SecurityAssessmentConfiguration());
+        modelBuilder.ApplyConfiguration(new WindowsEventConfiguration());
+        modelBuilder.ApplyConfiguration(new WindowsEventCheckpointConfiguration());
 
         modelBuilder.ApplyConfiguration(new RoleConfiguration());
         modelBuilder.ApplyConfiguration(new UserConfiguration());

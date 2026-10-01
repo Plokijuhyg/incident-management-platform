@@ -36,6 +36,72 @@ public static class DataSeeder
         await SeedAdminUserAsync(context, passwordHasher, adminEmail, adminPassword, logger, cancellationToken);
     }
 
+    /// <summary>
+    /// Seeds a dedicated, least-privilege account for machine-to-machine
+    /// ingestion (e.g. the HexStrike connector script). SocAnalyst role only
+    /// — per api-design.md §5, any authenticated role may POST an alert;
+    /// this account should never hold Admin/SecurityManager.
+    /// </summary>
+    public static async Task SeedIntegrationAccountAsync(
+        AppDbContext context,
+        IPasswordHasher passwordHasher,
+        string? email,
+        string? password,
+        ILogger logger,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+        {
+            return; // optional — silently skipped if not configured
+        }
+
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+
+        var alreadyExists = await context.Users.AnyAsync(u => u.Email == normalizedEmail, cancellationToken);
+        if (alreadyExists)
+        {
+            return;
+        }
+
+        var socRole = await context.Roles.SingleOrDefaultAsync(r => r.Name == RoleNames.SocAnalyst, cancellationToken);
+        if (socRole is null)
+        {
+            logger.LogWarning("Cannot seed integration account: SOC_ANALYST role not found yet.");
+            return;
+        }
+
+        var adminForAttribution = await context.Users
+            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+            .FirstOrDefaultAsync(u => u.UserRoles.Any(ur => ur.Role.Name == RoleNames.Admin), cancellationToken);
+
+        var now = DateTime.UtcNow;
+
+        var integrationUser = new User
+        {
+            Email = normalizedEmail,
+            FullName = "HexStrike Connector (Service Account)",
+            PasswordHash = passwordHasher.Hash(password),
+            IsActive = true,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        context.Users.Add(integrationUser);
+        await context.SaveChangesAsync(cancellationToken); // generates Id
+
+        context.UserRoles.Add(new UserRole
+        {
+            UserId = integrationUser.Id,
+            RoleId = socRole.Id,
+            AssignedAt = now,
+            AssignedById = adminForAttribution?.Id ?? integrationUser.Id
+        });
+
+        await context.SaveChangesAsync(cancellationToken);
+
+        logger.LogInformation("Seeded integration service account {Email}", normalizedEmail);
+    }
+
     private static async Task SeedAdminUserAsync(
         AppDbContext context,
         IPasswordHasher passwordHasher,
@@ -74,14 +140,14 @@ public static class DataSeeder
         };
 
         context.Users.Add(adminUser);
-        await context.SaveChangesAsync(cancellationToken); // generates adminUser.Id
+        await context.SaveChangesAsync(cancellationToken);
 
         context.UserRoles.Add(new UserRole
         {
             UserId = adminUser.Id,
             RoleId = adminRole.Id,
             AssignedAt = DateTime.UtcNow,
-            AssignedById = adminUser.Id // bootstrap case: no other user exists yet
+            AssignedById = adminUser.Id
         });
 
         await context.SaveChangesAsync(cancellationToken);
