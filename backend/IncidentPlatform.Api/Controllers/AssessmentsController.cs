@@ -11,6 +11,20 @@ public record ScanAssessmentRequest(string TargetId,string[] Categories,string[]
 [ApiController,Authorize(Roles=$"{RoleNames.Admin},{RoleNames.SecurityManager}"),Route("api/assessments")]
 public sealed class AssessmentsController(AssessmentService service,AssessmentGateway gateway,AppDbContext db):ControllerBase
 {
+ // Offline tool catalog: what the platform supports, visible before the Kali gateway is connected.
+ [HttpGet("catalog")]public IActionResult Catalog()
+ {
+  var tools=HexStrikeCatalog.Tools();
+  return Ok(new{
+   enabled=gateway.Enabled,
+   categories=HexStrikeCatalog.Categories,
+   reviewedTotal=tools.Count(t=>t.Runnable),
+   advertisedTotal=tools.Count(t=>!t.Runnable),
+   total=tools.Count,
+   note="Reviewed tools can run once the Kali gateway is connected and the binary is installed. Advertised tools are shown for planning only; the live gateway may advertise more tools still. Execution always requires an approved private lab target and intrusive-check confirmation.",
+   tools
+  });
+ }
  [HttpGet("targets")]public IActionResult Targets()=>Ok(gateway.Targets.Where(x=>x.Approved).Select(x=>new{x.Id,x.Name,x.Ip}));
  [HttpGet("capabilities")]public async Task<IActionResult> Capabilities(CancellationToken ct)=>Ok(await gateway.Capabilities(ct));
  [HttpGet]public async Task<IActionResult> List(CancellationToken ct)=>Ok(await db.SecurityAssessments.AsNoTracking().OrderByDescending(x=>x.RequestedAt).Take(100).Select(x=>new{x.Id,x.TargetName,x.TargetIp,x.Profile,x.Status,x.RequestedAt,x.StartedAt,x.FinishedAt,x.Error}).ToListAsync(ct));

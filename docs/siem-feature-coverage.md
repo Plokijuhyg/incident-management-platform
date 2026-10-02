@@ -22,6 +22,7 @@ This maps executable product capabilities to UI entry points. Test code, migrati
 | Rule-based incident automation and standards evidence | Automation & coverage: versioned policies, observed/promoted decisions, NIST/CIS/ISO support and explicit benchmark gaps |
 | Curated detection baseline (enable supported High/Critical rules, suppress noise) | Automation & coverage → Detection baseline: one-click apply in Observe mode; `GET`/`POST /api/detection-rules/baseline`. Excludes Sysmon-only rules (no Sysmon channel collected) |
 | Persisted assessment queue/history/evidence | Assessments; remote execution disabled until Laptop 2 is ready |
+| Offline HexStrike tool catalog (supported tools by category/tier) | Assessments → Supported tools; `GET /api/assessments/catalog`. Visible before the gateway connects; 21 reviewed/runnable, rest advertised-for-planning |
 | Readiness, rate limiting, security headers, validation | Enforced API infrastructure, not manual UI actions |
 
 ## Real telemetry versus fixtures

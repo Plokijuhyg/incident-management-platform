@@ -446,6 +446,11 @@ try {
           evidence:{enabled:true,retentionDays:7,lastCycleAt:new Date().toISOString(),storedEvents:1234,decisions:0,channels:[]},
           benchmark:{platform:'Windows 11',profile:'Level 1 proposed',status:'Not assessed',version:null,reference:'https://www.cisecurity.org/benchmark/microsoft_windows_desktop',reason:'Configuration evidence is required.'}
         };
+        else if (path === '/api/assessments/catalog') body = {enabled:false,categories:['Network','Web','Cloud','API'],reviewedTotal:21,advertisedTotal:38,total:59,note:'Reviewed tools can run once the gateway is connected.',tools:[
+          {name:'nmap_scan',category:'Network',tier:'safe',status:'reviewed',description:'TCP service inventory.',reason:'',runnable:true},
+          {name:'sqlmap_scan',category:'Web',tier:'unclassified',status:'advertised',description:'Advertised by the tool manifest; no reviewed run-adapter yet.',reason:'Needs an explicit parameterized request.',runnable:false},
+          {name:'prowler_scan',category:'Cloud',tier:'unclassified',status:'advertised',description:'Advertised by the tool manifest; no reviewed run-adapter yet.',reason:'Cloud authorization is not a lab IP.',runnable:false},
+          {name:'api_fuzzer',category:'API',tier:'intrusive',status:'reviewed',description:'GET-only API checks.',reason:'',runnable:true}]};
         else if (path === '/api/assessments/capabilities')
           body = assessmentConnected ? {
             connected:true, message:'Live MCP fixture',profiles:[],manifestId:'fixture',tools:[
@@ -850,6 +855,7 @@ try {
   await until(()=>evaluate(`!document.querySelector('dialog[open]') && document.activeElement===window.__eventTrigger && document.body.style.overflow!== 'hidden'`),'Closing event did not restore focus and scrolling');
   await screenshot('browser-windows-events');
   await go('/assessments', 'Security Assessments');
+  await until(() => textHas('Supported tools') && textHas('nmap_scan'), 'Tool catalog missing');
   await until(
     () => textHas('Gateway unavailable'),
     'Disconnected gateway status missing',

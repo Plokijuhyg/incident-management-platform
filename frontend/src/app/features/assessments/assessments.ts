@@ -3,6 +3,7 @@ import { ActivatedRoute } from '@angular/router';
 import { AssessmentAnalysisPanel } from './assessment-analysis';
 import { InfoPopup } from '../../shared/components/detail-modal';
 import { DetailModal } from '../../shared/components/detail-modal';
+import { ToolCatalog } from './tool-catalog';
 import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
@@ -40,7 +41,7 @@ interface Assessment {
   analysisJson?: string | null;
 }
 @Component({
-  imports: [AssessmentAnalysisPanel,InfoPopup,DetailModal,FormsModule, ErrorNotice],
+  imports: [AssessmentAnalysisPanel,InfoPopup,DetailModal,FormsModule, ErrorNotice, ToolCatalog],
   styleUrl: './assessments.css',
   template: `
     <div class="page-heading">
@@ -54,6 +55,7 @@ interface Assessment {
       </button>
     </div>
     <app-error-notice [messages]="errors()" />
+    <app-tool-catalog />
     <form class="assessment-builder" (ngSubmit)="start()">
       <div class="builder-main">
         <section class="panel setup-section">

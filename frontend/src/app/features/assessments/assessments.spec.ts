@@ -13,6 +13,7 @@ it('shows live tools, blocks unavailable tools and submits only the selected sco
  TestBed.configureTestingModule({providers:[provideHttpClient(),provideHttpClientTesting()]});
  const fixture=TestBed.createComponent(AssessmentsPage);
  const http=TestBed.inject(HttpTestingController);
+ http.expectOne('/api/assessments/catalog').flush({enabled:false,categories:[],reviewedTotal:0,advertisedTotal:0,total:0,note:'',tools:[]});
  http.expectOne('/api/assessments/targets').flush([{id:'lab',name:'Lab',ip:'192.168.207.129'}]);
  http.expectOne('/api/assessments/capabilities').flush({connected:true,message:'Live',profiles:[],manifestId:'manifest',tools:[
   {name:'nikto_scan',category:'Web',tier:'intrusive',available:true,description:'Bounded web checks',reason:''},
