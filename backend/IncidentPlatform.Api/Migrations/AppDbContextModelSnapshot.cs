@@ -897,6 +897,118 @@ namespace IncidentPlatform.Api.Migrations
                     b.ToTable("Iocs", (string)null);
                 });
 
+            modelBuilder.Entity("IncidentPlatform.Api.Models.LogEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Action")
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<int?>("AlertId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DestinationIp")
+                        .HasMaxLength(45)
+                        .HasColumnType("varchar(45)");
+
+                    b.Property<int?>("DestinationPort")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("Enriched")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("EnrichmentJson")
+                        .HasColumnType("json");
+
+                    b.Property<DateTime>("EventTime")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Facility")
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)");
+
+                    b.Property<string>("FieldsJson")
+                        .HasColumnType("json");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<string>("Host")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Outcome")
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)");
+
+                    b.Property<string>("Protocol")
+                        .HasMaxLength(16)
+                        .HasColumnType("varchar(16)");
+
+                    b.Property<string>("RawLog")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("Severity")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("SourceIp")
+                        .HasMaxLength(45)
+                        .HasColumnType("varchar(45)");
+
+                    b.Property<int?>("SourcePort")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<string>("User")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AlertId");
+
+                    b.HasIndex("DestinationIp");
+
+                    b.HasIndex("EventTime");
+
+                    b.HasIndex("Fingerprint")
+                        .IsUnique();
+
+                    b.HasIndex("ReceivedAt");
+
+                    b.HasIndex("SourceIp");
+
+                    b.HasIndex("Source", "Id");
+
+                    b.HasIndex("SourceType", "Id");
+
+                    b.ToTable("LogEvents");
+                });
+
             modelBuilder.Entity("IncidentPlatform.Api.Models.MitreTechnique", b =>
                 {
                     b.Property<int>("Id")
@@ -1596,6 +1708,14 @@ namespace IncidentPlatform.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("CreatedBy");
+                });
+
+            modelBuilder.Entity("IncidentPlatform.Api.Models.LogEvent", b =>
+                {
+                    b.HasOne("IncidentPlatform.Api.Models.Alert", null)
+                        .WithMany()
+                        .HasForeignKey("AlertId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("IncidentPlatform.Api.Models.MitreTechnique", b =>

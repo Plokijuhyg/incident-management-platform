@@ -237,4 +237,53 @@ public class AlertsControllerTests : IClassFixture<TestApiFactory>
             await CleanupUserAsync(email);
         }
     }
+
+    [Fact]
+    public async Task GetPaged_FiltersSearchesAndSortsTheQueue()
+    {
+        var email = await CreateUserAsync(RoleNames.SocAnalyst);
+        // The test database is shared with other tests; a unique token scopes every query.
+        var token = $"q{Guid.NewGuid():N}"[..12];
+        try
+        {
+            var client = await AuthenticatedClientAsync(email);
+            async Task<AlertDetailResponse> Create(string title, string severity, AlertSource source, int minutesAgo)
+            {
+                var response = await client.PostAsJsonAsync("/api/alerts", new AlertCreateRequest
+                {
+                    Title = title, Severity = severity, Source = source,
+                    Description = $"Contains {token}", DetectedAt = DateTime.UtcNow.AddMinutes(-minutesAgo)
+                });
+                response.EnsureSuccessStatusCode();
+                return (await response.Content.ReadFromJsonAsync<AlertDetailResponse>())!;
+            }
+            var high = await Create("Brute force", "High", AlertSource.Siem, 30);
+            var low = await Create("Port scan", "low", AlertSource.Ids, 20);
+            var critical = await Create("Ransomware note", "Critical", AlertSource.Edr, 10);
+            (await client.PostAsJsonAsync($"/api/alerts/{low.Id}/false-positive", new FalsePositiveRequest { Reason = "Scanner" }))
+                .EnsureSuccessStatusCode();
+
+            async Task<List<int>> Ids(string query) =>
+                (await client.GetFromJsonAsync<IncidentPlatform.Api.DTOs.Common.PagedResult<AlertSummaryResponse>>($"/api/alerts?search={token}&{query}"))!
+                    .Items.Select(a => a.Id).ToList();
+
+            Assert.Equal([critical.Id, low.Id, high.Id], await Ids(""));                       // newest first by default
+            Assert.Equal([critical.Id, high.Id, low.Id], await Ids("sort=severity"));          // severity descends by default
+            Assert.Equal([low.Id, high.Id, critical.Id], await Ids("sort=severity&direction=asc"));
+            Assert.Equal([low.Id], await Ids("severity=LOW"));                                  // case-insensitive
+            Assert.Equal([critical.Id, high.Id], await Ids("openOnly=true"));
+            Assert.Equal([high.Id], await Ids($"source={(int)AlertSource.Siem}"));
+            Assert.Equal([critical.Id], await Ids($"detectedFrom={Uri.EscapeDataString(DateTime.UtcNow.AddMinutes(-15).ToString("o"))}"));
+            Assert.Empty(await Ids("search2=ignored&status=Promoted"));
+
+            Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync("/api/alerts?sort=rawPayload")).StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync("/api/alerts?direction=sideways")).StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync(
+                $"/api/alerts?detectedFrom=2026-02-01T00:00:00Z&detectedTo=2026-01-01T00:00:00Z")).StatusCode);
+        }
+        finally
+        {
+            await CleanupUserAsync(email);
+        }
+    }
 }

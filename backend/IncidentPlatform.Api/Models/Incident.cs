@@ -59,7 +59,8 @@ public enum IncidentSource
     UserReport,
     ThreatIntel,
     PenTest,
-    WindowsEvent
+    WindowsEvent,
+    Vpn
 }
 
 /// <summary>

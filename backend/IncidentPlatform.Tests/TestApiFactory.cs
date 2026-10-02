@@ -17,7 +17,9 @@ public sealed class TestApiFactory : WebApplicationFactory<Program>
     {
         builder.UseEnvironment("Testing");
         // Integration fixtures must not inherit a running real Kali gateway from user secrets.
-        builder.ConfigureAppConfiguration((_,config)=>config.AddInMemoryCollection(new Dictionary<string,string?> { ["HexStrike:Enabled"]="false", ["VirusTotal:ApiKey"]="", ["Notifications:Enabled"]="false", ["Ollama:Enabled"]="false" }));
+        builder.ConfigureAppConfiguration((_,config)=>config.AddInMemoryCollection(new Dictionary<string,string?> { ["HexStrike:Enabled"]="false", ["VirusTotal:ApiKey"]="", ["Notifications:Enabled"]="false", ["Ollama:Enabled"]="false",
+            // Log ingestion on, with one known key: SHA-256 of "test-ingest-key-0001".
+            ["Ingestion:Enabled"]="true", ["Ingestion:Keys:0"]="280B09A38F5DCA421B24E427AFE37027D21F49EFC975DFE2A86CEC4105808778" }));
         builder.ConfigureServices(services =>
         {
             var settings=new ConfigurationBuilder().AddUserSecrets<Program>().AddEnvironmentVariables().Build();

@@ -17,8 +17,10 @@ This maps executable product capabilities to UI entry points. Test code, migrati
 | Dashboard SQL counts, trends and metrics | Dashboard: incident metrics refresh every 15 seconds; real Windows activity, ingestion chart and latest events every 5 seconds; latest incidents link to the complete register |
 | Global and incident-scoped audit | Audit trail for admins; incident audit history for managers/admins |
 | Windows event collection and native XML | Windows Events, managers/admins; channel errors and coverage shown |
+| Generic log ingestion (syslog/firewall/VPN/API) → parse → normalize → enrich → detect | Logs page (managers/admins); `POST /api/logs/ingest` with a pre-shared key; IOC enrichment and built-in rules raise alerts |
 | HexStrike/Ollama health checks | Lab connections; health is not proof of assessment readiness |
 | Rule-based incident automation and standards evidence | Automation & coverage: versioned policies, observed/promoted decisions, NIST/CIS/ISO support and explicit benchmark gaps |
+| Curated detection baseline (enable supported High/Critical rules, suppress noise) | Automation & coverage → Detection baseline: one-click apply in Observe mode; `GET`/`POST /api/detection-rules/baseline`. Excludes Sysmon-only rules (no Sysmon channel collected) |
 | Persisted assessment queue/history/evidence | Assessments; remote execution disabled until Laptop 2 is ready |
 | Readiness, rate limiting, security headers, validation | Enforced API infrastructure, not manual UI actions |
 

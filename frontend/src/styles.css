@@ -1803,3 +1803,96 @@ code, pre, .soc-details pre {
 
 /* SOC status accents and accessible chart interaction */
 .spotlight-stats .stat-card{border-top:4px solid #3386ce}.spotlight-stats .stat-card:nth-child(2){border-top-color:#1b9ba6}.spotlight-stats .stat-card:nth-child(3){border-top-color:#e5ac29}.spotlight-stats .stat-card.critical{border-top-color:#c92a3d}.event-query{flex:1 1 100%;min-width:280px}.event-query input{font-family:Consolas,monospace;font-size:14px}.event-query small{display:block;max-width:1000px;margin-top:6px}.soc-details{scroll-margin-top:24px}.trend-series{stroke:#3386ce!important;stroke-width:3!important}.trend-point{fill:#3386ce!important}.trend-point:hover{fill:#e5ac29!important;r:6}.soc-chart rect:hover{opacity:.7;cursor:crosshair}
+
+/* Sortable column headers (shared/components/sort-header.ts) */
+.sort-button {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+.sort-button:focus-visible {
+  outline: 3px solid #1d949c;
+  outline-offset: 2px;
+}
+.sort-arrow {
+  font-size: 11px;
+  color: var(--muted);
+}
+th[aria-sort] .sort-arrow {
+  color: var(--teal);
+}
+
+/* Alert triage: queue on the left, selected alert on the right (features/alerts/alert-queue.ts) */
+.compact-heading {
+  margin-bottom: 12px;
+}
+.compact-heading h1 {
+  margin-bottom: 0;
+}
+.triage-layout {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+}
+.triage-layout.with-panel {
+  grid-template-columns: minmax(0, 1.5fr) minmax(360px, 1fr);
+}
+.triage-queue {
+  min-width: 0;
+}
+.triage-panel {
+  position: sticky;
+  top: 12px;
+  max-height: calc(100vh - 24px);
+  overflow: auto;
+}
+.panel-close {
+  float: right;
+}
+.queue-status {
+  margin: 0;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.queue-table td {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.queue-table tbody tr.selected,
+.queue-table tbody tr.selected:hover {
+  background: #e3f3f4;
+  box-shadow: inset 4px 0 0 var(--teal);
+}
+.rule-id {
+  display: block;
+  font-family: Consolas, monospace;
+  font-size: 12px;
+  color: var(--muted);
+}
+.triage-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+.triage-facts dt {
+  font-size: 12px;
+}
+.triage-facts dd {
+  margin: 4px 0 0;
+}
+@media (max-width: 1100px) {
+  .triage-layout.with-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* On narrow screens the open alert comes first; the queue follows below it. */
+  .triage-panel {
+    position: static;
+    max-height: none;
+    order: -1;
+  }
+}

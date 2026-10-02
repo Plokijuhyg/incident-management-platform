@@ -4,6 +4,22 @@ using IncidentPlatform.Api.Models;
 
 namespace IncidentPlatform.Api.Validators;
 
+public class IncidentQueryValidator : AbstractValidator<IncidentQuery>
+{
+    public IncidentQueryValidator()
+    {
+        RuleFor(x => x.Search).MaximumLength(200);
+        RuleFor(x => x.Sort).Must(s => s is null || IncidentQuery.SortKeys.Contains(s))
+            .WithMessage($"Sort must be one of: {string.Join(", ", IncidentQuery.SortKeys)}.");
+        RuleFor(x => x.Direction).Must(d => d is null or "asc" or "desc").WithMessage("Direction must be asc or desc.");
+        RuleFor(x => x.Unassigned).Equal(false).When(x => x.AssignedToId is not null)
+            .WithMessage("Use either assignedToId or unassigned, not both.");
+        RuleFor(x => x.CreatedTo).GreaterThanOrEqualTo(x => x.CreatedFrom)
+            .When(x => x.CreatedFrom is not null && x.CreatedTo is not null)
+            .WithMessage("CreatedTo cannot be earlier than CreatedFrom.");
+    }
+}
+
 public class IncidentCreateRequestValidator : AbstractValidator<IncidentCreateRequest>
 {
     public IncidentCreateRequestValidator()

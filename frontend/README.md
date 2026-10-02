@@ -57,8 +57,19 @@ is only for the local ASP.NET development certificate. Adjust `proxy.conf.json` 
 - Admin audit browser with filters and pagination; account page with password change.
 - Admin lab connection settings/status checks for configured HexStrike and Ollama services.
 
-The current incident list endpoint implements only `page` and `pageSize`; filtering/search/sorting
-controls await API support. MITRE is a reference catalog, not an editor. Account reactivation
+- Alert triage: the queue (open alerts by default) and the selected alert share one page. Opening
+  an alert shows its evidence and promote / false-positive actions beside the list, which keeps
+  its filters, sort and scroll position. Promotion starts from the alert's source severity.
+  The queue refreshes every 30 seconds while the tab is visible.
+- Incident register and alert queue support search, filters and sortable columns. All list
+  state (filters, sort, page) is kept in the URL, so views survive back navigation and can be shared.
+- Logs page (managers/admins): the unified, normalized view of ingested syslog/firewall/VPN/API
+  events on one UTC timeline, with source/severity/IP/outcome filters, search, sortable columns and
+  a detail panel showing the raw line, parsed fields and threat-intel enrichment. Events that matched
+  a rule link to the alert they raised. Backed by `GET /api/logs`; ingestion is `POST /api/logs/ingest`
+  with a pre-shared `X-Ingest-Key` (see `docs/api-design.md` §5a).
+
+MITRE is a reference catalog, not an editor. Account reactivation
 and administrator password reset are not exposed by the user-management endpoints.
 
 ## Local lab configuration

@@ -425,6 +425,8 @@ try {
         else if (path === '/api/soc/techniques/1/incidents') body = [{id:42,incidentNumber:'INC-FIXTURE',title:'Fixture investigation',severity:2,status:0}];
         else if (path === '/api/soc/tasks') body = {total:1,items:[{id:1,incidentId:42,incidentNumber:'INC-FIXTURE',actionType:10,description:'Restore lab service',targetValue:'Fixture host',status:0,result:null,owner:'Fixture owner'}]};
         else if (path === '/api/soc/analytics') body = {observedAt:new Date().toISOString(),start:new Date(Date.now()-3600000).toISOString(),width:1,total:1,series:[{index:30,count:1}],items:[{id:1,receivedAt:new Date().toISOString(),machine:'Fixture SOC host',provider:'Fixture provider',channel:'Application',eventId:1000,level:4,message:'Fixture raw message'}],hasMore:false};
+        else if (path === '/api/detection-rules/baseline') body = {recommendedTotal:135,recommendedEnabled:0,recommendedDisabled:135,noisyEnabled:1,enabledTotal:2,importedTotal:2607,note:'Recommended = supported, mapped to a collected Windows channel, High or Critical, excluding known-noisy rules.',items:[{id:1,externalRuleId:'10000000-0000-4000-8000-000000000001',title:'Failed logons (brute force)',severity:'High',service:'security',enabled:false}]};
+        else if (path === '/api/detection-rules/baseline/apply' && request.method === 'POST') body = {recommendedTotal:135,enabled:135,alreadyEnabled:0,disabled:1,alertsSuppressed:89};
         else if (path === '/api/detection-rules') body = {total:1,page:1,items:[{id:1,externalRuleId:'10000000-0000-4000-8000-000000000001',title:'Sigma review fixture',severity:'High',referenceTag:'attack.t1110',enabled:false,updatedAt:'2026-09-27T10:00:00Z',unsupportedReason:null,definition:{logsource:{product:'windows',service:'security'},detection:{selection:{EventID:4625},condition:'selection'},tags:['attack.t1110'],sourceFile:'fixture.yml',sourceSha256:'fixture',description:'Failed login fixture',falsepositives:['Authorized lab activity']}}]};
         else if (path === '/api/detection-rules/1/enabled' && request.method === 'PUT') {
           const review=JSON.parse(request.postData);
@@ -757,6 +759,8 @@ try {
   await screenshot('browser-alerts');
   await evaluate(`document.querySelector('a[href="/alerts/11"]').click()`);
   await until(() => textHas('Promote to incident'), 'Alert detail missing');
+  assert(await evaluate(`!!document.querySelector('.triage-panel') && !!document.querySelector('.queue-table tr.selected')`), 'Alert did not open beside the queue');
+  await screenshot('browser-alert-triage');
   await clickButton('Load indicators & saved reports');
   await until(()=>evaluate(`!!document.querySelector('.intel-select select')`),'Intel candidates missing');
   await evaluate(`const select=document.querySelector('.intel-select select');select.value='0';select.dispatchEvent(new Event('change',{bubbles:true}));`);
@@ -930,7 +934,7 @@ try {
   await until(() => textHas('Policy saved.'), 'Automation policy not saved');
   await clickButton('Load rules');
   await until(() => textHas('Sigma review fixture'), 'Imported Sigma rules missing');
-  await evaluate(`document.querySelector('app-imported-rules .popup-trigger').click()`);
+  await evaluate(`Array.from(document.querySelectorAll('app-imported-rules .popup-trigger')).find(e=>e.textContent.includes('Sigma review fixture')).click()`);
   await until(() => textHas('Authorized lab activity'), 'Rule false-positive context missing');
   assert(await evaluate(`Array.from(document.querySelectorAll('app-imported-rules button')).find(b=>b.textContent.includes('Enable reviewed rule')).disabled`),'Sigma enable did not require review');
   await evaluate(`document.querySelector('app-imported-rules input[type=checkbox]').click()`);

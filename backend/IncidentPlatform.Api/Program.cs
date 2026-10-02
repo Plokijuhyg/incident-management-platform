@@ -114,6 +114,9 @@ try
     builder.Services.AddScoped<IAssetService, AssetService>();
     builder.Services.AddScoped<IMitreService, MitreService>();
     builder.Services.AddScoped<IIncidentSubResourceService, IncidentSubResourceService>();
+    builder.Services.AddScoped<IncidentPlatform.Api.Services.Ingestion.LogIngestAccess>();
+    builder.Services.AddScoped<IncidentPlatform.Api.Services.Ingestion.ILogIngestionService, IncidentPlatform.Api.Services.Ingestion.LogIngestionService>();
+    builder.Services.AddScoped<IncidentPlatform.Api.Services.Ingestion.ILogQueryService, IncidentPlatform.Api.Services.Ingestion.LogQueryService>();
     builder.Services
         .AddOptions<CorsSettings>()
         .Bind(builder.Configuration.GetSection(CorsSettings.SectionName))

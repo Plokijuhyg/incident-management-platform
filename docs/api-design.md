@@ -150,10 +150,15 @@ read it.
 ¹ Analysts may modify incidents assigned to them; managers and admins, any.
 Enforced in the service layer, not the route.
 
-**`GET /api/incidents` filters:** `status`, `severity`, `priority`, `category`,
-`source`, `assignedToId`, `createdById`, `unassigned=true`, `detectedFrom`,
-`detectedTo`, `createdFrom`, `createdTo`, `search` (title + incident number +
-description), `iocValue`, `assetId`, `mitreTechniqueId`.
+**`GET /api/incidents` filters (implemented):** `status`, `severity`, `priority`,
+`category`, `source`, `assignedToId`, `unassigned=true` (not combinable with
+`assignedToId`), `openOnly=true` (excludes Resolved, Closed, FalsePositive),
+`createdFrom`, `createdTo`, `search` (title + incident number + description, max 200).
+Sorting: `sort` = `createdAt` (default) | `updatedAt` | `severity` | `priority` |
+`status` | `title` | `incidentNumber`, `direction` = `asc` | `desc`. Enum sorts follow
+severity/workflow order, not alphabetical; ties break on newest id. Unknown sort keys
+return `400`. Still planned: `createdById`, `detectedFrom/To`, `iocValue`, `assetId`,
+`mitreTechniqueId`.
 
 List items are a **summary** projection (no descriptions, no child collections) —
 selected with `.Select()` so the SQL fetches only those columns. Loading full
@@ -206,7 +211,7 @@ analyst actually wants.
 
 | Method | Route | Roles | Description |
 |---|---|---|---|
-| GET | `/api/alerts` | All | Filters: `status`, `source`, `severity`, `detectedFrom/To`, `search`, `unpromoted=true` |
+| GET | `/api/alerts` | All | Filters: `status`, `source`, `severity` (source text, case-insensitive), `detectedFrom/To`, `search` (title, description, rule ID), `openOnly=true` (New + InReview). Sort: `detectedAt` (default) \| `severity` \| `status` \| `source` \| `title`, `direction` = `asc` \| `desc` |
 | POST | `/api/alerts` | All | Manual alert creation |
 | GET | `/api/alerts/{id}` | All | Detail including `rawPayload` |
 | POST | `/api/alerts/{id}/promote` | All | → incident |
@@ -218,6 +223,28 @@ fields to seed (`title`, `severity`, `priority`, `category`); it creates the
 incident, links the alert, sets the alert to `PROMOTED`, and writes an
 `ALERT_RECEIVED` timeline event with `occurredAt` = the alert's `detectedAt` — one
 transaction, or none of it. Returns `201` with the new incident.
+
+---
+
+## 5a. Log ingestion — `/api/logs`
+
+The generic (non-Windows) ingestion pipeline: **Raw → Parse → Normalize → Enrich → detect**.
+Every ingested line becomes a `LogEvent` on one common schema and UTC timeline, so syslog,
+firewall, VPN and API feeds are jointly queryable and feed the same alert path.
+
+| Method | Route | Roles | Description |
+|---|---|---|---|
+| POST | `/api/logs/ingest` | Ingest key | Anonymous; gated by `X-Ingest-Key` (SHA-256 in `Ingestion:Keys`), HTTPS-only, off unless `Ingestion:Enabled`. Body `{ source, format, lines[] }`; `format` = `Syslog`\|`Firewall`\|`Vpn`\|`Json`\|`KeyValue`. Returns `{ accepted, duplicates, alerts, blank }`. Deduplicates by fingerprint; rejections audited |
+| GET | `/api/logs` | Admin, Manager | Filters: `source`, `sourceType`, `maxSeverity` (0 worst … 7), `action`, `outcome`, `ip` (src or dst), `user`, `search` (message), `from`/`to` (event time), `alertsOnly=true`. Sort: `eventTime` (default) \| `receivedAt` \| `severity` \| `source` |
+| GET | `/api/logs/{id}` | Admin, Manager | Detail incl. raw line, parsed fields, enrichment |
+| GET | `/api/logs/summary` | Admin, Manager | Store totals, last-hour volume, alerts raised, per-source stats |
+
+Parsers: syslog RFC 5424 and RFC 3164 (3164 has no year/zone — current UTC year assumed);
+firewall/VPN key-value lifted from the syslog message; JSON objects. Normalization maps vendor
+aliases (`src`/`srcip`/`saddr` → source IP, etc.) and converts timestamps to UTC. **Enrich**: source
+and destination IPs are matched against malicious IOCs; a hit raises a High `LOG-IOC-MATCH` alert.
+Built-in rules also cover `VPN-AUTH-FAILURE` and `LOG-CRITICAL-SEVERITY`. Correlation/threshold rules
+across many events are a later increment; automation auto-promote still applies to Windows alerts only.
 
 ---
 

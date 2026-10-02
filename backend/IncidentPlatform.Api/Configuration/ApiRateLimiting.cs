@@ -55,6 +55,11 @@ public static class ApiRateLimiting
         {
             policy="telemetry"; limit=120; identity="ip:"+(context.Connection.RemoteIpAddress?.ToString()??"unknown");
         }
+        else if (endpoint is { ControllerName: "Logs", ActionName: "Ingest" })
+        {
+            policy = "ingest"; limit = 600;
+            identity = "ip:" + (context.Connection.RemoteIpAddress?.ToString() ?? "unknown");
+        }
         else if (endpoint is { ControllerName: "Evidence", ActionName: "Upload" })
         {
             policy = "upload";

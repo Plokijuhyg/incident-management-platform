@@ -412,6 +412,56 @@ public class IncidentsControllerTests : IClassFixture<TestApiFactory>
         }
     }
 
+    [Fact]
+    public async Task GetPaged_FiltersSearchesAndSortsTheRegister()
+    {
+        var (managerEmail, managerId) = await CreateUserWithRoleAsync(RoleNames.SecurityManager);
+        // The test database is shared with other tests; a unique token scopes every query.
+        var token = $"q{Guid.NewGuid():N}"[..12];
+
+        try
+        {
+            var client = await AuthenticatedClientAsync(managerEmail);
+            async Task<IncidentDetailResponse> Create(string title, IncidentSeverity severity)
+            {
+                var request = NewIncident($"{title} {token}");
+                request.Severity = severity;
+                var response = await client.PostAsJsonAsync("/api/incidents", request);
+                response.EnsureSuccessStatusCode();
+                return (await response.Content.ReadFromJsonAsync<IncidentDetailResponse>())!;
+            }
+            var low = await Create("Adware", IncidentSeverity.Low);
+            var critical = await Create("Domain admin compromise", IncidentSeverity.Critical);
+            var medium = await Create("Phishing click", IncidentSeverity.Medium);
+            (await client.PostAsJsonAsync($"/api/incidents/{critical.Id}/assign",
+                new AssignIncidentRequest { AssignedToId = managerId })).EnsureSuccessStatusCode();
+            (await client.PostAsJsonAsync($"/api/incidents/{low.Id}/close",
+                new CloseIncidentRequest { ResolutionSummary = "Removed" })).EnsureSuccessStatusCode();
+
+            async Task<List<int>> Ids(string query) =>
+                (await client.GetFromJsonAsync<PagedResult<IncidentSummaryResponse>>($"/api/incidents?search={token}&{query}"))!
+                    .Items.Select(i => i.Id).ToList();
+
+            Assert.Equal([medium.Id, critical.Id, low.Id], await Ids(""));                     // newest first by default
+            Assert.Equal([critical.Id, medium.Id, low.Id], await Ids("sort=severity"));        // not alphabetical
+            Assert.Equal([low.Id, medium.Id, critical.Id], await Ids("sort=severity&direction=asc"));
+            Assert.Equal([critical.Id], await Ids("severity=Critical"));
+            Assert.Equal([critical.Id], await Ids($"assignedToId={managerId}"));
+            Assert.Equal([medium.Id, low.Id], await Ids("unassigned=true"));
+            Assert.Equal([medium.Id, critical.Id], await Ids("openOnly=true"));
+            Assert.Equal([low.Id], await Ids("status=Closed"));
+            Assert.Equal([critical.Id], (await client.GetFromJsonAsync<PagedResult<IncidentSummaryResponse>>(
+                $"/api/incidents?search={Uri.EscapeDataString(critical.IncidentNumber)}"))!.Items.Select(i => i.Id).ToList());
+
+            Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync("/api/incidents?sort=description")).StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync($"/api/incidents?assignedToId={managerId}&unassigned=true")).StatusCode);
+        }
+        finally
+        {
+            await CleanupUserAsync(managerEmail);
+        }
+    }
+
     private sealed class FixedUser(int id, params string[] roles) : IncidentPlatform.Api.Interfaces.ICurrentUser
     {
         public int Id => id;

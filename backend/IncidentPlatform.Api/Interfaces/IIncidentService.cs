@@ -5,7 +5,7 @@ namespace IncidentPlatform.Api.Interfaces;
 
 public interface IIncidentService
 {
-    Task<PagedResult<IncidentSummaryResponse>> GetPagedAsync(int page, int pageSize, CancellationToken cancellationToken = default);
+    Task<PagedResult<IncidentSummaryResponse>> GetPagedAsync(IncidentQuery query, CancellationToken cancellationToken = default);
 
     Task<IncidentDetailResponse> GetByIdAsync(int id, CancellationToken cancellationToken = default);
 

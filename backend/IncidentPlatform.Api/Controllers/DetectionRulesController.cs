@@ -105,4 +105,71 @@ public sealed class DetectionRulesController(AppDbContext db,ICurrentUser user) 
         await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);
         return Ok(new{rule.Id,rule.Enabled,rule.UpdatedAt});
     }
+
+    // The curated baseline: which high-value, supported, collectable rules are recommended, and what is on now.
+    [HttpGet("baseline")]
+    public async Task<IActionResult> Baseline(CancellationToken ct)
+    {
+        var candidates=await db.DetectionRules.FromSqlRaw(DetectionBaseline.CandidateSql).AsNoTracking().ToListAsync(ct);
+        var recommended=candidates.Where(DetectionBaseline.IsRecommended).OrderByDescending(r=>r.Severity).ThenBy(r=>r.Title).ToList();
+        var noise=await db.DetectionRules.AsNoTracking().Where(r=>DetectionBaseline.NoiseDenylist.Contains(r.ExternalRuleId)).ToListAsync(ct);
+        return Ok(new{
+            recommendedTotal=recommended.Count,
+            recommendedEnabled=recommended.Count(r=>r.Enabled),
+            recommendedDisabled=recommended.Count(r=>!r.Enabled),
+            noisyEnabled=noise.Count(r=>r.Enabled),
+            enabledTotal=await db.DetectionRules.CountAsync(r=>r.Enabled,ct),
+            importedTotal=await db.DetectionRules.CountAsync(ct),
+            collectedChannels=DetectionBaseline.SupportedServices,
+            note="Recommended = supported by the evaluator, mapped to a collected Windows channel, High or Critical, excluding known-noisy rules. Sysmon-only rules are excluded because no Sysmon channel is collected.",
+            items=recommended.Select(r=>new{r.Id,r.ExternalRuleId,r.Title,r.Severity,service=DetectionBaseline.Service(r),r.Enabled})
+        });
+    }
+
+    public sealed record ApplyBaselineRequest(bool Confirmed);
+    // Enable every recommended rule in Observe mode (alerts, no auto-incident), disable denylisted noise,
+    // and close the noise's open alerts. Idempotent, one transaction, Admin only.
+    [HttpPost("baseline/apply"),Authorize(Roles=RoleNames.Admin)]
+    public async Task<IActionResult> ApplyBaseline(ApplyBaselineRequest request,CancellationToken ct)
+    {
+        if(!request.Confirmed)return BadRequest(new{message="Confirm applying the recommended detection baseline. Matching events will raise alerts for review (Observe mode; no incidents are opened automatically)."});
+        var candidates=await db.DetectionRules.FromSqlRaw(DetectionBaseline.CandidateSql).AsNoTracking().ToListAsync(ct);
+        var recommendedIds=candidates.Where(DetectionBaseline.IsRecommended).Select(r=>r.Id).ToHashSet();
+
+        await using var tx=await db.Database.BeginTransactionAsync(ct);
+        var now=DateTime.UtcNow;
+        var rules=await db.DetectionRules.Where(r=>recommendedIds.Contains(r.Id)).ToListAsync(ct);
+        var alreadyEnabled=rules.Count(r=>r.Enabled);
+        var enabled=0;
+        foreach(var rule in rules.Where(r=>!r.Enabled))
+        {
+            rule.Enabled=true;rule.UpdatedAt=now;
+            await UpsertPolicy(rule.ExternalRuleId,"Observe",now,ct);
+            enabled++;
+        }
+        var noise=await db.DetectionRules.Where(r=>DetectionBaseline.NoiseDenylist.Contains(r.ExternalRuleId) && r.Enabled).ToListAsync(ct);
+        var disabled=0;var suppressed=0;
+        foreach(var rule in noise)
+        {
+            rule.Enabled=false;rule.UpdatedAt=now;
+            await UpsertPolicy(rule.ExternalRuleId,"Disabled",now,ct);
+            var open=await db.Alerts.Where(a=>a.SourceRuleId=="SIGMA-"+rule.ExternalRuleId &&
+                (a.Status==AlertStatus.New || a.Status==AlertStatus.InReview)).ToListAsync(ct);
+            foreach(var alert in open){alert.Status=AlertStatus.Closed;alert.TriagedById=user.Id;alert.TriagedAt=now;suppressed++;}
+            disabled++;
+        }
+        db.AuditLogs.Add(new(){ActorUserId=user.Id,Action="DETECTION_BASELINE_APPLIED",EntityType="DetectionRule",Outcome=AuditOutcome.Success,OccurredAt=now,
+            Details=JsonSerializer.Serialize(new{recommendedTotal=recommendedIds.Count,enabled,alreadyEnabled,disabled,alertsSuppressed=suppressed})});
+        await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);
+        return Ok(new{recommendedTotal=recommendedIds.Count,enabled,alreadyEnabled,disabled,alertsSuppressed=suppressed});
+    }
+
+    private async Task UpsertPolicy(string externalRuleId,string mode,DateTime now,CancellationToken ct)
+    {
+        var policyId="SIGMA-"+externalRuleId;
+        var policy=await db.AutomationRules.SingleOrDefaultAsync(p=>p.Id==policyId,ct);
+        if(policy is null){policy=new AutomationRule{Id=policyId};db.AutomationRules.Add(policy);}
+        if(policy.Mode!=mode)policy.Version++;
+        policy.Mode=mode;policy.ApprovedById=user.Id;policy.EffectiveFrom=now;policy.UpdatedAt=now;
+    }
 }

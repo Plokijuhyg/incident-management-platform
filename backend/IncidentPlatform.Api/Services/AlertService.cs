@@ -21,19 +21,43 @@ public class AlertService : IAlertService
         _currentUser = currentUser;
     }
 
-    public async Task<PagedResult<AlertSummaryResponse>> GetPagedAsync(int page, int pageSize, AlertStatus? status, AlertSource? source, CancellationToken cancellationToken = default)
+    public async Task<PagedResult<AlertSummaryResponse>> GetPagedAsync(AlertQuery filter, CancellationToken cancellationToken = default)
     {
-        page = Math.Max(page, 1);
-        pageSize = Math.Clamp(pageSize, 1, 100);
+        var page = Math.Max(filter.Page, 1);
+        var pageSize = Math.Clamp(filter.PageSize, 1, 100);
 
         var query = _dbContext.Alerts.AsQueryable();
 
-        if (status is not null) query = query.Where(a => a.Status == status);
-        if (source is not null) query = query.Where(a => a.Source == source);
-
-        query = query.OrderByDescending(a => a.DetectedAt);
+        if (filter.Status is not null) query = query.Where(a => a.Status == filter.Status);
+        if (filter.Source is not null) query = query.Where(a => a.Source == filter.Source);
+        if (filter.OpenOnly) query = query.Where(a => a.Status == AlertStatus.New || a.Status == AlertStatus.InReview);
+        // Source severity is free text; the column's default MySQL collation compares case-insensitively.
+        if (!string.IsNullOrWhiteSpace(filter.Severity)) query = query.Where(a => a.Severity == filter.Severity.Trim());
+        if (filter.DetectedFrom is not null) query = query.Where(a => a.DetectedAt >= filter.DetectedFrom);
+        if (filter.DetectedTo is not null) query = query.Where(a => a.DetectedAt <= filter.DetectedTo);
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            var term = filter.Search.Trim();
+            query = query.Where(a => a.Title.Contains(term) ||
+                (a.Description != null && a.Description.Contains(term)) ||
+                (a.SourceRuleId != null && a.SourceRuleId.Contains(term)));
+        }
 
         var totalCount = await query.CountAsync(cancellationToken);
+
+        var sort = filter.Sort ?? AlertQuery.DefaultSort;
+        var descending = QueryOrdering.IsDescending(filter.Direction, defaultDescending: sort is "detectedAt" or "severity");
+        var ordered = sort switch
+        {
+            // Known severity words rank above unrecognised source-specific values.
+            "severity" => query.OrderBy(a => a.Severity == "Critical" ? 4 : a.Severity == "High" ? 3 :
+                a.Severity == "Medium" ? 2 : a.Severity == "Low" ? 1 : 0, descending),
+            "status" => query.OrderBy(QueryOrdering.ByEnumOrder<Alert, AlertStatus>(a => a.Status), descending),
+            "source" => query.OrderBy(QueryOrdering.ByEnumOrder<Alert, AlertSource>(a => a.Source), descending),
+            "title" => query.OrderBy(a => a.Title, descending),
+            _ => query.OrderBy(a => a.DetectedAt, descending)
+        };
+        query = ordered.ThenByDescending(a => a.Id);
 
         var items = await query
             .Skip((page - 1) * pageSize)
@@ -42,6 +66,7 @@ public class AlertService : IAlertService
             {
                 Id = a.Id,
                 Title = a.Title,
+                SourceRuleId = a.SourceRuleId,
                 Source = a.Source,
                 Severity = a.Severity,
                 Status = a.Status,

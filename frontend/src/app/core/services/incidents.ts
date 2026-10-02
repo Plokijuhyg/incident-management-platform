@@ -25,9 +25,12 @@ function normalizeDetail(value: IncidentDetail): IncidentDetail {
 @Injectable({ providedIn: 'root' })
 export class Incidents {
   private readonly http = inject(HttpClient);
-  list(page = 1, pageSize = 25) {
+  /** `filters` are passed through as query parameters; empty values are dropped. */
+  list(page = 1, pageSize = 25, filters: Record<string, string | number | boolean> = {}) {
+    const params: Record<string, string | number | boolean> = { page, pageSize };
+    for (const [key, value] of Object.entries(filters)) if (value !== '') params[key] = value;
     return this.http
-      .get<Page<IncidentSummary>>('/api/incidents', { params: { page, pageSize } })
+      .get<Page<IncidentSummary>>('/api/incidents', { params })
       .pipe(
         map((result) => ({
           ...result,

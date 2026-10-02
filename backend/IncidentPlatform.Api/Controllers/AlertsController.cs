@@ -22,11 +22,9 @@ public class AlertsController : ControllerBase
 
     [HttpGet]
     public async Task<ActionResult<PagedResult<AlertSummaryResponse>>> GetPaged(
-        [FromQuery] int page = 1, [FromQuery] int pageSize = 25,
-        [FromQuery] AlertStatus? status = null, [FromQuery] AlertSource? source = null,
-        CancellationToken cancellationToken = default)
+        [FromQuery] AlertQuery query, CancellationToken cancellationToken = default)
     {
-        return Ok(await _alertService.GetPagedAsync(page, pageSize, status, source, cancellationToken));
+        return Ok(await _alertService.GetPagedAsync(query, cancellationToken));
     }
 
     [HttpGet("{id:int}")]

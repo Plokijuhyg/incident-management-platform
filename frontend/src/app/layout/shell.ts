@@ -16,12 +16,13 @@ import { ErrorNotice } from '../shared/components/error-notice';
         <a class="brand" routerLink="/dashboard"><span class="brand-mark">IP</span><span>Incident<span class="brand-accent">SIEM</span></span></a>
         <nav class="primary-tabs" aria-label="Main sections">
           <a routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
-          @if(auth.canManageIncidents()){<a routerLink="/analytics" routerLinkActive="active">Analytics</a>}
+          <a routerLink="/alerts" routerLinkActive="active">Alerts</a>
           <a routerLink="/incidents" routerLinkActive="active">Incidents</a>
-          <a routerLink="/assets" routerLinkActive="active">CMDB</a>
+          @if(auth.canManageIncidents()){<a routerLink="/analytics" routerLinkActive="active">Analytics</a>}
+          <a routerLink="/assets" routerLinkActive="active">Assets</a>
           <a routerLink="/resources" routerLinkActive="active">Resources</a>
           <a routerLink="/tasks" routerLinkActive="active">Tasks</a>
-          @if(auth.hasRole('ADMIN')){<a routerLink="/users" routerLinkActive="active">Admin</a>}
+          @if(auth.hasRole('ADMIN')){<a routerLink="/users" routerLinkActive="active">Users</a>}
         </nav>
       </header>
       <div class="workspace">
@@ -101,6 +102,7 @@ export class Shell {
     { path: '/overview', label: 'Overview', icon: 'dashboard', admin: false },
     { path: '/attack-matrix', label: 'MITRE ATT&CK', icon: 'mitre', admin: false },
     { path: '/dashboard', label: 'Dashboard', icon: 'dashboard', admin: false },
+    { path: '/alerts', label: 'Alerts', icon: 'alerts', admin: false },
     { path: '/incidents', label: 'Incidents', icon: 'incidents', admin: false },
     {
       path: '/windows-events',
@@ -109,9 +111,9 @@ export class Shell {
       admin: false,
       manager: true,
     },
+    { path: '/logs', label: 'Logs', icon: 'audit', admin: false, manager: true },
     { path: '/automation', label: 'Automation & coverage', icon: 'audit', admin: false, manager: true },
     { path: '/assessments', label: 'Assessments', icon: 'lab', admin: false, manager: true },
-    { path: '/alerts', label: 'Alerts', icon: 'alerts', admin: false },
     { path: '/iocs', label: 'Indicators', icon: 'iocs', admin: false },
     { path: '/assets', label: 'Assets', icon: 'assets', admin: false },
     { path: '/users', label: 'Users', icon: 'users', admin: true },

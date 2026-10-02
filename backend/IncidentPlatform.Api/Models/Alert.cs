@@ -16,7 +16,10 @@ public enum AlertSource
     /// (docs/architecture.md §7).
     /// </summary>
     PenTest,
-    WindowsEvent
+    WindowsEvent,
+
+    /// <summary>Raised from an ingested VPN log (see Models/LogEvent.cs).</summary>
+    Vpn
 }
 
 public enum AlertStatus

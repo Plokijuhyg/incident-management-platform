@@ -222,7 +222,9 @@ Login, guarded shell, incident list/detail/create/actions, evidence, user admini
 and dashboard pages now consume the API.
 The workspace explicitly enables zoneless change detection and strict templates.
 Feature routes are lazy; numeric enum options match the current C# wire format.
-The list uses real server pagination; search/filter controls await backend support.
+Incident and alert lists use server-side pagination, filtering, search and sorting, with all
+list state in the URL query string. Alerts use one route (`alertsMatcher`) for the queue and
+the selected alert, so the queue component is reused when the triage panel opens.
 
 Access tokens remain in memory. Concurrent route guards share one refresh-cookie
 request on reload. API 401 responses clear the session and return to login without

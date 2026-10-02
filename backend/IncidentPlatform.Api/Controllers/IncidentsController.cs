@@ -36,9 +36,9 @@ public class IncidentsController : ControllerBase
 
     [HttpGet]
     public async Task<ActionResult<PagedResult<IncidentSummaryResponse>>> GetPaged(
-        [FromQuery] int page = 1, [FromQuery] int pageSize = 25, CancellationToken cancellationToken = default)
+        [FromQuery] IncidentQuery query, CancellationToken cancellationToken = default)
     {
-        return Ok(await _incidentService.GetPagedAsync(page, pageSize, cancellationToken));
+        return Ok(await _incidentService.GetPagedAsync(query, cancellationToken));
     }
 
     [HttpGet("{id:int}")]

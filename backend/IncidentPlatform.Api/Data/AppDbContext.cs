@@ -19,6 +19,7 @@ public partial class AppDbContext : DbContext
     public DbSet<SecurityAssessment> SecurityAssessments => Set<SecurityAssessment>();
     public DbSet<WindowsEvent> WindowsEvents => Set<WindowsEvent>();
     public DbSet<WindowsEventCheckpoint> WindowsEventCheckpoints => Set<WindowsEventCheckpoint>();
+    public DbSet<LogEvent> LogEvents => Set<LogEvent>();
 
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<User> Users => Set<User>();
@@ -49,6 +50,7 @@ public partial class AppDbContext : DbContext
         modelBuilder.ApplyConfiguration(new SecurityAssessmentConfiguration());
         modelBuilder.ApplyConfiguration(new WindowsEventConfiguration());
         modelBuilder.ApplyConfiguration(new WindowsEventCheckpointConfiguration());
+        modelBuilder.ApplyConfiguration(new LogEventConfiguration());
 
         modelBuilder.ApplyConfiguration(new RoleConfiguration());
         modelBuilder.ApplyConfiguration(new UserConfiguration());

@@ -7,7 +7,7 @@ namespace IncidentPlatform.Api.Interfaces;
 
 public interface IAlertService
 {
-    Task<PagedResult<AlertSummaryResponse>> GetPagedAsync(int page, int pageSize, AlertStatus? status, AlertSource? source, CancellationToken cancellationToken = default);
+    Task<PagedResult<AlertSummaryResponse>> GetPagedAsync(AlertQuery query, CancellationToken cancellationToken = default);
 
     Task<AlertDetailResponse> GetByIdAsync(int id, CancellationToken cancellationToken = default);
 

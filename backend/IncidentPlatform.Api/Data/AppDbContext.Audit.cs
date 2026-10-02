@@ -43,7 +43,9 @@ public partial class AppDbContext
             throw new InvalidOperationException("Audit records are append-only.");
 
         var pending = ChangeTracker.Entries()
-            .Where(e => e.Entity is not AuditLog and not RefreshToken and not IncidentNumberSequence &&
+            // LogEvent is high-volume ingested telemetry; it is covered by a single
+            // per-batch summary audit row, not one row per line (see LogIngestionService).
+            .Where(e => e.Entity is not AuditLog and not RefreshToken and not IncidentNumberSequence and not LogEvent &&
                 e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
             .Select(e => new
             {

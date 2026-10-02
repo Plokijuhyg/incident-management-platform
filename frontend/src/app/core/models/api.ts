@@ -94,3 +94,21 @@ export const sources = [
   'WindowsEvent',
 ];
 export type LoadState<T> = { loading: boolean; data: T | null; errors: string[] };
+export interface AlertSummary {
+  id: number;
+  title: string;
+  sourceRuleId: string | null;
+  source: number;
+  /** Source-reported free text, e.g. "High" or "high"; not the incident severity enum. */
+  severity: string;
+  status: number;
+  incidentId: number | null;
+  detectedAt: string;
+}
+export interface AlertDetail extends AlertSummary {
+  recommendedAction: string | null;
+  description: string | null;
+  rawPayload: string | null;
+  receivedAt: string;
+  triagedAt: string | null;
+}

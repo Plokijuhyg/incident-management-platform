@@ -2,6 +2,31 @@ using IncidentPlatform.Api.Models;
 
 namespace IncidentPlatform.Api.DTOs.Incidents;
 
+/// <summary>Bound from the query string of GET /api/incidents (api-design.md §3).</summary>
+public class IncidentQuery
+{
+    public const string DefaultSort = "createdAt";
+    public static readonly string[] SortKeys = ["createdAt", "updatedAt", "severity", "priority", "status", "title", "incidentNumber"];
+
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 25;
+    public IncidentStatus? Status { get; set; }
+    public IncidentSeverity? Severity { get; set; }
+    public IncidentPriority? Priority { get; set; }
+    public IncidentCategory? Category { get; set; }
+    public IncidentSource? Source { get; set; }
+    public int? AssignedToId { get; set; }
+    public bool Unassigned { get; set; }
+    /// <summary>Excludes Resolved, Closed and FalsePositive (same definition as the dashboard).</summary>
+    public bool OpenOnly { get; set; }
+    /// <summary>Matches title, incident number and description.</summary>
+    public string? Search { get; set; }
+    public DateTime? CreatedFrom { get; set; }
+    public DateTime? CreatedTo { get; set; }
+    public string? Sort { get; set; }
+    public string? Direction { get; set; }
+}
+
 /// <summary>
 /// Summary projection for list endpoints — api-design.md §3: no
 /// descriptions, no child collections, selected via .Select() so the SQL

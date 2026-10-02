@@ -20,16 +20,49 @@ public class IncidentService : IIncidentService
         _currentUser = currentUser;
     }
 
-    public async Task<PagedResult<IncidentSummaryResponse>> GetPagedAsync(int page, int pageSize, CancellationToken cancellationToken = default)
+    public async Task<PagedResult<IncidentSummaryResponse>> GetPagedAsync(IncidentQuery filter, CancellationToken cancellationToken = default)
     {
-        page = Math.Max(page, 1);
-        pageSize = Math.Clamp(pageSize, 1, 100);
+        var page = Math.Max(filter.Page, 1);
+        var pageSize = Math.Clamp(filter.PageSize, 1, 100);
 
-        var query = _dbContext.Incidents
-            .OrderByDescending(i => i.CreatedAt)
-            .AsQueryable();
+        var query = _dbContext.Incidents.AsQueryable();
+
+        if (filter.Status is not null) query = query.Where(i => i.Status == filter.Status);
+        if (filter.Severity is not null) query = query.Where(i => i.Severity == filter.Severity);
+        if (filter.Priority is not null) query = query.Where(i => i.Priority == filter.Priority);
+        if (filter.Category is not null) query = query.Where(i => i.Category == filter.Category);
+        if (filter.Source is not null) query = query.Where(i => i.Source == filter.Source);
+        if (filter.AssignedToId is not null) query = query.Where(i => i.AssignedToId == filter.AssignedToId);
+        if (filter.Unassigned) query = query.Where(i => i.AssignedToId == null);
+        if (filter.OpenOnly)
+        {
+            query = query.Where(i => i.Status != IncidentStatus.Resolved &&
+                i.Status != IncidentStatus.Closed && i.Status != IncidentStatus.FalsePositive);
+        }
+        if (filter.CreatedFrom is not null) query = query.Where(i => i.CreatedAt >= filter.CreatedFrom);
+        if (filter.CreatedTo is not null) query = query.Where(i => i.CreatedAt <= filter.CreatedTo);
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            var term = filter.Search.Trim();
+            query = query.Where(i => i.Title.Contains(term) || i.IncidentNumber.Contains(term) || i.Description.Contains(term));
+        }
 
         var totalCount = await query.CountAsync(cancellationToken);
+
+        var sort = filter.Sort ?? IncidentQuery.DefaultSort;
+        var descending = QueryOrdering.IsDescending(filter.Direction, defaultDescending: sort is "createdAt" or "updatedAt" or "severity" or "priority");
+        var ordered = sort switch
+        {
+            "updatedAt" => query.OrderBy(i => i.UpdatedAt, descending),
+            "severity" => query.OrderBy(QueryOrdering.ByEnumOrder<Incident, IncidentSeverity>(i => i.Severity), descending),
+            "priority" => query.OrderBy(QueryOrdering.ByEnumOrder<Incident, IncidentPriority>(i => i.Priority), descending),
+            "status" => query.OrderBy(QueryOrdering.ByEnumOrder<Incident, IncidentStatus>(i => i.Status), descending),
+            "title" => query.OrderBy(i => i.Title, descending),
+            "incidentNumber" => query.OrderBy(i => i.IncidentNumber, descending),
+            _ => query.OrderBy(i => i.CreatedAt, descending)
+        };
+        // Stable paging when the sort key ties (same severity, same second).
+        query = ordered.ThenByDescending(i => i.Id);
 
         var items = await query
             .Skip((page - 1) * pageSize)

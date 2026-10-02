@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { adminGuard, authGuard, guestGuard, managerGuard } from './core/guards/auth';
+import { alertsMatcher } from './features/alerts/alerts-matcher';
 export const routes: Routes = [
   {
     path: 'login',
@@ -35,6 +36,12 @@ export const routes: Routes = [
           import('./features/windows-events/windows-events').then((m) => m.WindowsEventsPage),
       },
       {
+        path: 'logs',
+        title: 'Logs | Incident Platform',
+        canActivate: [managerGuard],
+        loadComponent: () => import('./features/logs/logs-page').then((m) => m.LogsPage),
+      },
+      {
         path: 'dashboard',
         title: 'Dashboard | Incident Platform',
         loadComponent: () => import('./features/dashboard/dashboard').then((m) => m.Dashboard),
@@ -58,16 +65,9 @@ export const routes: Routes = [
         loadComponent: () => import('./features/users/user-page').then((m) => m.UserPage),
       },
       {
-        path: 'alerts',
-        data: { kind: 'alerts' },
-        title: 'ALERTS | Incident Platform',
-        loadComponent: () => import('./features/catalog/catalog-page').then((m) => m.CatalogPage),
-      },
-      {
-        path: 'alerts/:id',
-        data: { kind: 'alerts' },
-        title: 'ALERTS | Incident Platform',
-        loadComponent: () => import('./features/catalog/catalog-page').then((m) => m.CatalogPage),
+        matcher: alertsMatcher,
+        title: 'Alerts | Incident Platform',
+        loadComponent: () => import('./features/alerts/alert-queue').then((m) => m.AlertQueue),
       },
       {
         path: 'iocs',
