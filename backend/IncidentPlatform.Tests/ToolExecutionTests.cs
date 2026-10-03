@@ -45,6 +45,7 @@ public class ToolExecutionTests : IClassFixture<TestApiFactory>
                             new { name = "katana_crawl", category = "Web", tier = "intrusive", available = true, reason = "" },
                             new { name = "nmap_scan", category = "Network", tier = "safe", available = true, reason = "" },
                             new { name = "sqlmap_scan", category = "Web", tier = "unclassified", available = false, reason = "Needs an explicit parameterized request." },
+                            new { name = "execute_command", category = "Web", tier = "unclassified", available = false, reason = "Generic command execution is not permitted." },
                         }
                         : Array.Empty<object>(),
                 };
@@ -114,6 +115,11 @@ public class ToolExecutionTests : IClassFixture<TestApiFactory>
             Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/assessments/execute", Body("totally_unknown_tool"))).StatusCode);
             // Discovered but not authorized (needs setup) → 409, no execution.
             Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync("/api/assessments/execute", Body("sqlmap_scan"))).StatusCode);
+            // Arbitrary generic command → discovered but unavailable → 409, never executed.
+            Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync("/api/assessments/execute", Body("execute_command"))).StatusCode);
+            // Arbitrary executable path / shell string → rejected by the name validator (400).
+            Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/assessments/execute", Body("/usr/bin/nmap"))).StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/assessments/execute", Body("nmap; rm -rf /"))).StatusCode);
             // Unapproved public target override → 403, rejected before any gateway call.
             var beforeCaps = handler.CapabilityCalls;
             Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/assessments/execute", Body("katana_crawl", target: "", ip: "8.8.8.8"))).StatusCode);

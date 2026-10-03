@@ -35,6 +35,8 @@ for name,binary,category,tier,description in [
  ('rpcclient_enumeration','rpcclient','Network','intrusive','Anonymous RPC domain information; fixed read-only RPC commands.'),
  ('nbtscan_netbios','nbtscan','Network','safe','NetBIOS information from the single approved IP; no subnet sweep.'),
  ('katana_crawl','katana','Web','intrusive','Bounded crawl of one explicit web endpoint: depth 1, one worker, rate limited, no JS/headless, no update checks. Raw inventory only.'),
+ ('hakrawler_crawl','hakrawler','Web','intrusive','Bounded crawl of one explicit web endpoint: depth 1, one thread, no subdomains, TLS verified. Raw inventory only.'),
+ ('x8_parameter_discovery','x8','Web','intrusive','Hidden GET parameter discovery on one explicit endpoint with a small reviewed wordlist and bounded concurrency; no payloads or exploitation.'),
  ('api_fuzzer','curl','API','intrusive','GET-only checks of health, status and version under the explicit API path. Raw responses, no inferred vulnerabilities.'),
  ('graphql_scanner','curl','API','intrusive','Introspection, depth-two and ten-query batch checks on the explicit GraphQL path. Upstream hypotheses are unvalidated.'),
  ('api_schema_analyzer','curl','API','safe','Fetch and inspect the explicit OpenAPI/Swagger URL. Upstream hypotheses are unvalidated.')
@@ -54,6 +56,16 @@ REASONS={
  'responder_credential_harvest':'Listens on a network segment and captures credentials; cannot be scoped to one approved target IP.',
 }
 
+# Tools that can never be authorized in this IP-scoped lab model, whatever the live manifest says:
+# generic command execution, raw-socket/privilege needs, wrong package, listeners, composite workflows.
+HARD_BLOCKED={'execute_command','httpx_probe','masscan_high_speed','rustscan_fast_scan','responder_credential_harvest','comprehensive_api_audit'}
+
+def tool_state(name,category,preset,available):
+ # Every manifest tool is 'discovered'; this refines that into the application's authorization view.
+ if preset:return 'available' if available else 'unavailable'
+ if category=='Cloud' or name in HARD_BLOCKED:return 'blocked'
+ return 'needs_setup'
+
 def catalog(manifest, health):
  tools=[]
  for tool in manifest:
@@ -63,6 +75,8 @@ def catalog(manifest, health):
   entry=dict(name=name,category=category,tier="unclassified",available=False,reason=REASONS.get(name,"Needs a reviewed execution adapter and the appropriate target scope."),description=tool.get('description','')[:1000],inputSchema=tool['inputSchema'])
   if preset: entry.update(category=preset['category'],tier=preset['tier'],description=preset['description'],available=available,reason="" if available else "Required executable is unavailable.")
   if category=='Cloud':entry['reason']='Cloud account/cluster authorization is not represented by a lab IP; execution unavailable.'
+  # Every manifest tool is discovered; state/authorized express the application's policy view on top of presence.
+  entry['discovered']=True;entry['state']=tool_state(name,entry['category'],preset,available);entry['authorized']=available
   tools.append(entry)
  root=Path(__file__).resolve().parent
  files=[root/name for name in ('scan_policy.py','selected_scans.py','mcp_transport.py','vulnerability_checks.py')]+sorted((root/'templates').glob('*.yaml'))

@@ -73,19 +73,31 @@ class SelectionTests(unittest.TestCase):
    api=extra_arguments('api_fuzzer',folder,target,url);self.assertEqual(api['methods'],'GET')
  def test_api_nested_failure_is_not_reported_as_success(self):
   self.assertFalse(response_success('api_fuzzer',dict(success=True,results=[dict(result=dict(success=False,return_code=1))]*3)))
- def test_poc_tool_runs_through_the_same_generic_path(self):
-  # A newly-added preset (katana_crawl) executes through run_selected's generic MCP
-  # call loop with no tool-specific execution code — only a bounded argument adapter.
-  self.assertIn('katana_crawl',PRESETS)
-  cap=catalog([dict(name=n,inputSchema={}) for n in ('katana_crawl',)],dict(tools_status=dict(katana=True)))
-  value=dict(categories=['Web'],selectedTools=['katana_crawl'],manifestId=cap['manifestId'],confirmed=True,webPort=8080,webHttps=False,webPath='/')
-  self.assertEqual(resolve(value,cap)['selectedTools'],['katana_crawl'])
+ def test_config_only_tools_run_through_the_same_generic_path(self):
+  # Presets added purely as declarative config (katana/hakrawler/x8) execute through
+  # run_selected's generic MCP call loop with NO tool-specific execution code.
+  names=('katana_crawl','hakrawler_crawl','x8_parameter_discovery')
+  for name in names:self.assertIn(name,PRESETS)
+  cap=catalog([dict(name=n,inputSchema={}) for n in names],dict(tools_status=dict(katana=True,hakrawler=True,x8=True)))
+  value=dict(categories=['Web'],selectedTools=list(names),manifestId=cap['manifestId'],confirmed=True,webPort=8080,webHttps=False,webPath='/')
+  self.assertEqual(resolve(value,cap)['selectedTools'],sorted(names))
   with tempfile.TemporaryDirectory() as temp:
    calls=[]
    def invoke(v):calls.append(v);return dict(success=True,return_code=0)
-   result,status=run_selected(Path(temp),'192.168.207.129',value,invoke)
+   result,status=run_selected(Path(temp),'192.168.207.129',resolve(value,cap),invoke)
    self.assertEqual(status,'Completed')
-   self.assertEqual([c['name'] for c in calls],['katana_crawl'])
-   self.assertEqual(calls[0]['operation'],'call')
-   self.assertEqual(calls[0]['arguments']['url'],'http://192.168.207.129:8080/')
-   self.assertIn('-depth 1',calls[0]['arguments']['additional_args'])
+   self.assertEqual(sorted(c['name'] for c in calls),sorted(names))
+   for c in calls:
+    self.assertEqual(c['operation'],'call')
+    self.assertEqual(c['arguments']['url'],'http://192.168.207.129:8080/')
+ def test_catalog_states_distinguish_authorization_from_presence(self):
+  # discovered (always), available/unavailable (preset + binary), needs_setup, blocked.
+  manifest=[dict(name=n,inputSchema={}) for n in ('nmap_scan','katana_crawl','sqlmap_scan','prowler_scan','execute_command')]
+  cap=catalog(manifest,dict(tools_status=dict(nmap=True,katana=False)))
+  state={t['name']:t for t in cap['tools']}
+  self.assertTrue(all(t['discovered'] for t in cap['tools']))
+  self.assertEqual(state['nmap_scan']['state'],'available');self.assertTrue(state['nmap_scan']['authorized'])
+  self.assertEqual(state['katana_crawl']['state'],'unavailable');self.assertFalse(state['katana_crawl']['authorized'])
+  self.assertEqual(state['sqlmap_scan']['state'],'needs_setup')
+  self.assertEqual(state['prowler_scan']['state'],'blocked')
+  self.assertEqual(state['execute_command']['state'],'blocked')  # arbitrary command never authorized

@@ -16,11 +16,11 @@ public class HexStrikeCatalogTests
     [Fact]
     public void Catalog_mirrors_the_reviewed_policy_and_marks_runnable_tools()
     {
-        Assert.Equal(22, HexStrikeCatalog.ReviewedCount);
+        Assert.Equal(24, HexStrikeCatalog.ReviewedCount);
         Assert.Equal(4, HexStrikeCatalog.Categories.Length);
 
         var tools = HexStrikeCatalog.Tools();
-        Assert.Equal(22, tools.Count(t => t.Runnable));
+        Assert.Equal(24, tools.Count(t => t.Runnable));
         Assert.All(tools, t => Assert.Contains(t.Category, HexStrikeCatalog.Categories));
 
         var nmap = tools.Single(t => t.Name == "nmap_scan");
@@ -99,7 +99,7 @@ public class HexStrikeCatalogApiTests : IClassFixture<TestApiFactory>
         {
             var response = await manager.GetFromJsonAsync<CatalogResponse>("/api/assessments/catalog");
             Assert.False(response!.enabled);               // gateway disabled in Testing, catalog still available
-            Assert.Equal(22, response.reviewedTotal);
+            Assert.Equal(24, response.reviewedTotal);
             Assert.True(response.total >= 55);
             Assert.Equal(response.total, response.reviewedTotal + response.advertisedTotal);
             Assert.Contains(response.tools, t => t.Name == "nmap_scan" && t.Runnable);

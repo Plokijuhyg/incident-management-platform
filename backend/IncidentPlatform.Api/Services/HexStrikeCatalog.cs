@@ -52,6 +52,8 @@ public static class HexStrikeCatalog
         ["rpcclient_enumeration"] = ("Network", "intrusive", "Anonymous RPC domain information; fixed read-only RPC commands."),
         ["nbtscan_netbios"] = ("Network", "safe", "NetBIOS information from the single approved IP; no subnet sweep."),
         ["katana_crawl"] = ("Web", "intrusive", "Bounded crawl of one explicit web endpoint: depth 1, one worker, rate limited, no JS/headless, no update checks. Raw inventory only."),
+        ["hakrawler_crawl"] = ("Web", "intrusive", "Bounded crawl of one explicit web endpoint: depth 1, one thread, no subdomains, TLS verified. Raw inventory only."),
+        ["x8_parameter_discovery"] = ("Web", "intrusive", "Hidden GET parameter discovery on one explicit endpoint with a small reviewed wordlist and bounded concurrency; no payloads or exploitation."),
         ["api_fuzzer"] = ("API", "intrusive", "GET-only checks of health, status and version under the explicit API path. Raw responses, no inferred vulnerabilities."),
         ["graphql_scanner"] = ("API", "intrusive", "Introspection, depth-two and ten-query batch checks on the explicit GraphQL path. Upstream hypotheses are unvalidated."),
         ["api_schema_analyzer"] = ("API", "safe", "Fetch and inspect the explicit OpenAPI/Swagger URL. Upstream hypotheses are unvalidated."),
