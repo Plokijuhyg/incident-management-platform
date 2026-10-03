@@ -876,7 +876,9 @@ try {
   await until(()=>evaluate(`!document.querySelector('dialog[open]') && document.activeElement===window.__eventTrigger && document.body.style.overflow!== 'hidden'`),'Closing event did not restore focus and scrolling');
   await screenshot('browser-windows-events');
   await go('/assessments', 'Security Assessments');
-  await until(() => textHas('Supported tools') && textHas('nmap_scan'), 'Tool catalog missing');
+  await until(() => textHas('Supported tools'), 'Tool catalog missing');
+  await evaluate(`Array.from(document.querySelectorAll('app-tool-catalog .catalog-toggle')).find(b=>b.textContent.includes('Network')).click()`);
+  await until(() => textHas('nmap_scan'), 'Tool catalog category did not expand');
   await until(
     () => textHas('Gateway unavailable'),
     'Disconnected gateway status missing',

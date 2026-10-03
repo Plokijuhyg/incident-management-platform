@@ -56,39 +56,50 @@ interface Catalog {
             checks.
           </p>
         }
+        <p class="muted small-text">Choose a category to view its tools.</p>
         @for (category of c.categories; track category) {
           <div class="catalog-category">
-            <h3>
+            <button
+              type="button"
+              class="catalog-toggle"
+              (click)="toggle(category)"
+              [attr.aria-expanded]="isExpanded(category)"
+            >
+              <span class="catalog-arrow" aria-hidden="true">{{
+                isExpanded(category) ? '▾' : '▸'
+              }}</span>
               {{ category }}
-              <span class="muted small-text">({{ byCategory(category).length }})</span>
-            </h3>
-            <div class="tool-cards">
-              @for (tool of byCategory(category); track tool.name) {
-                <div class="tool-card" [class.advertised]="!tool.runnable">
-                  <div class="tool-card-top">
-                    <code>{{ tool.name }}</code>
-                    @if (tool.runnable) {
-                      <span
-                        class="badge"
-                        [class.severity-0]="tool.tier === 'safe'"
-                        [class.severity-2]="tool.tier !== 'safe'"
-                      >
-                        {{ tool.tier === 'safe' ? 'Standard' : 'Confirm' }}
-                      </span>
-                    } @else {
-                      <span class="badge neutral">Needs setup</span>
+              <span class="muted small-text">({{ byCategory(category).length }} tools)</span>
+            </button>
+            @if (isExpanded(category)) {
+              <div class="tool-cards">
+                @for (tool of byCategory(category); track tool.name) {
+                  <div class="tool-card" [class.advertised]="!tool.runnable">
+                    <div class="tool-card-top">
+                      <code>{{ tool.name }}</code>
+                      @if (tool.runnable) {
+                        <span
+                          class="badge"
+                          [class.severity-0]="tool.tier === 'safe'"
+                          [class.severity-2]="tool.tier !== 'safe'"
+                        >
+                          {{ tool.tier === 'safe' ? 'Standard' : 'Confirm' }}
+                        </span>
+                      } @else {
+                        <span class="badge neutral">Needs setup</span>
+                      }
+                    </div>
+                    <p class="tool-desc">{{ tool.description }}</p>
+                    @if (!tool.runnable && tool.reason) {
+                      <app-info-popup title="{{ tool.name }} — why it cannot run yet">
+                        <span popupTrigger class="link-button">Why unavailable</span>
+                        <p>{{ tool.reason }}</p>
+                      </app-info-popup>
                     }
                   </div>
-                  <p class="tool-desc">{{ tool.description }}</p>
-                  @if (!tool.runnable && tool.reason) {
-                    <app-info-popup title="{{ tool.name }} — why it cannot run yet">
-                      <span popupTrigger class="link-button">Why unavailable</span>
-                      <p>{{ tool.reason }}</p>
-                    </app-info-popup>
-                  }
-                </div>
-              }
-            </div>
+                }
+              </div>
+            }
           </div>
         }
         <p class="muted small-text">{{ c.note }}</p>
@@ -114,12 +125,30 @@ interface Catalog {
         flex: none;
       }
       .catalog-category {
-        margin-top: 18px;
+        margin-top: 10px;
+        border-top: 1px solid var(--border);
       }
-      .catalog-category h3 {
-        margin-bottom: 10px;
+      .catalog-toggle {
+        all: unset;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        box-sizing: border-box;
+        cursor: pointer;
+        padding: 12px 4px;
+        font-weight: 700;
+      }
+      .catalog-toggle:focus-visible {
+        outline: 3px solid #1d949c;
+        outline-offset: 2px;
+      }
+      .catalog-arrow {
+        color: var(--teal);
+        width: 14px;
       }
       .tool-cards {
+        margin-bottom: 14px;
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
         gap: 12px;
@@ -157,6 +186,7 @@ export class ToolCatalog {
   private readonly http = inject(HttpClient);
   protected readonly catalog = signal<Catalog | null>(null);
   protected readonly failed = signal(false);
+  protected readonly expanded = signal<ReadonlySet<string>>(new Set());
   private readonly tools = computed(() => this.catalog()?.tools ?? []);
 
   constructor() {
@@ -167,5 +197,13 @@ export class ToolCatalog {
   }
   protected byCategory(category: string): ToolEntry[] {
     return this.tools().filter((t) => t.category === category);
+  }
+  protected isExpanded(category: string): boolean {
+    return this.expanded().has(category);
+  }
+  protected toggle(category: string): void {
+    const next = new Set(this.expanded());
+    next.has(category) ? next.delete(category) : next.add(category);
+    this.expanded.set(next);
   }
 }
