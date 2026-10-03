@@ -24,8 +24,9 @@ public sealed class AssessmentWorker(IServiceScopeFactory scopes,AssessmentGatew
    {
     if(job.Status=="Pending")
     {
-     var target=gateway.Targets.SingleOrDefault(x=>x.Approved&&x.Id==job.TargetId&&x.Ip==job.TargetIp);
-     if(target is null){job.Status="Failed";job.Error="Target approval changed before dispatch.";job.FinishedAt=DateTime.UtcNow;await db.SaveChangesAsync(ct);continue;}
+     // Resolve the same way as creation/analysis: an approved configured target, or a typed private lab IP.
+     var target=gateway.ResolveTarget(job.TargetId,job.TargetIp);
+     if(target is null||target.Ip!=job.TargetIp){job.Status="Failed";job.Error="Target approval changed before dispatch.";job.FinishedAt=DateTime.UtcNow;await db.SaveChangesAsync(ct);continue;}
      if(await db.SecurityAssessments.Where(x=>x.Id==job.Id&&x.Status=="Pending").ExecuteUpdateAsync(u=>u.SetProperty(x=>x.Status,"Running").SetProperty(x=>x.StartedAt,DateTime.UtcNow),ct)==0)continue;
      job.Status="Running";job.StartedAt=DateTime.UtcNow;db.Entry(job).State=EntityState.Unchanged;
     }
