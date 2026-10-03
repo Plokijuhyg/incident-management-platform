@@ -34,6 +34,7 @@ for name,binary,category,tier,description in [
  ('smbmap_scan','smbmap','Network','intrusive','Anonymous SMB share enumeration; write-access probes disabled.'),
  ('rpcclient_enumeration','rpcclient','Network','intrusive','Anonymous RPC domain information; fixed read-only RPC commands.'),
  ('nbtscan_netbios','nbtscan','Network','safe','NetBIOS information from the single approved IP; no subnet sweep.'),
+ ('katana_crawl','katana','Web','intrusive','Bounded crawl of one explicit web endpoint: depth 1, one worker, rate limited, no JS/headless, no update checks. Raw inventory only.'),
  ('api_fuzzer','curl','API','intrusive','GET-only checks of health, status and version under the explicit API path. Raw responses, no inferred vulnerabilities.'),
  ('graphql_scanner','curl','API','intrusive','Introspection, depth-two and ten-query batch checks on the explicit GraphQL path. Upstream hypotheses are unvalidated.'),
  ('api_schema_analyzer','curl','API','safe','Fetch and inspect the explicit OpenAPI/Swagger URL. Upstream hypotheses are unvalidated.')

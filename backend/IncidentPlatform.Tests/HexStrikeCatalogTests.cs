@@ -16,11 +16,11 @@ public class HexStrikeCatalogTests
     [Fact]
     public void Catalog_mirrors_the_reviewed_policy_and_marks_runnable_tools()
     {
-        Assert.Equal(21, HexStrikeCatalog.ReviewedCount);
+        Assert.Equal(22, HexStrikeCatalog.ReviewedCount);
         Assert.Equal(4, HexStrikeCatalog.Categories.Length);
 
         var tools = HexStrikeCatalog.Tools();
-        Assert.Equal(21, tools.Count(t => t.Runnable));
+        Assert.Equal(22, tools.Count(t => t.Runnable));
         Assert.All(tools, t => Assert.Contains(t.Category, HexStrikeCatalog.Categories));
 
         var nmap = tools.Single(t => t.Name == "nmap_scan");
@@ -28,13 +28,23 @@ public class HexStrikeCatalogTests
         Assert.Equal("safe", nmap.Tier);
         Assert.Equal("Network", nmap.Category);
         Assert.Equal("reviewed", nmap.Status);
+        Assert.Equal("available", nmap.State);
+
+        // POC tool added purely as a policy entry (no new execution code) is now reviewed/runnable.
+        var katana = tools.Single(t => t.Name == "katana_crawl");
+        Assert.True(katana.Runnable);
+        Assert.Equal("available", katana.State);
 
         var sqlmap = tools.Single(t => t.Name == "sqlmap_scan");
         Assert.False(sqlmap.Runnable);
         Assert.Equal("advertised", sqlmap.Status);
+        Assert.Equal("needs_setup", sqlmap.State);
         Assert.Contains("injection", sqlmap.Reason);
 
-        Assert.All(tools.Where(t => t.Category == "Cloud"), t => Assert.False(t.Runnable));
+        var responder = tools.Single(t => t.Name == "responder_credential_harvest");
+        Assert.Equal("blocked", responder.State);
+
+        Assert.All(tools.Where(t => t.Category == "Cloud"), t => { Assert.False(t.Runnable); Assert.Equal("blocked", t.State); });
     }
 }
 
@@ -89,7 +99,7 @@ public class HexStrikeCatalogApiTests : IClassFixture<TestApiFactory>
         {
             var response = await manager.GetFromJsonAsync<CatalogResponse>("/api/assessments/catalog");
             Assert.False(response!.enabled);               // gateway disabled in Testing, catalog still available
-            Assert.Equal(21, response.reviewedTotal);
+            Assert.Equal(22, response.reviewedTotal);
             Assert.True(response.total >= 55);
             Assert.Equal(response.total, response.reviewedTotal + response.advertisedTotal);
             Assert.Contains(response.tools, t => t.Name == "nmap_scan" && t.Runnable);

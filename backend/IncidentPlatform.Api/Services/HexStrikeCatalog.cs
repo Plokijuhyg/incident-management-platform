@@ -51,6 +51,7 @@ public static class HexStrikeCatalog
         ["smbmap_scan"] = ("Network", "intrusive", "Anonymous SMB share enumeration; write-access probes disabled."),
         ["rpcclient_enumeration"] = ("Network", "intrusive", "Anonymous RPC domain information; fixed read-only RPC commands."),
         ["nbtscan_netbios"] = ("Network", "safe", "NetBIOS information from the single approved IP; no subnet sweep."),
+        ["katana_crawl"] = ("Web", "intrusive", "Bounded crawl of one explicit web endpoint: depth 1, one worker, rate limited, no JS/headless, no update checks. Raw inventory only."),
         ["api_fuzzer"] = ("API", "intrusive", "GET-only checks of health, status and version under the explicit API path. Raw responses, no inferred vulnerabilities."),
         ["graphql_scanner"] = ("API", "intrusive", "Introspection, depth-two and ten-query batch checks on the explicit GraphQL path. Upstream hypotheses are unvalidated."),
         ["api_schema_analyzer"] = ("API", "safe", "Fetch and inspect the explicit OpenAPI/Swagger URL. Upstream hypotheses are unvalidated."),
@@ -69,7 +70,27 @@ public static class HexStrikeCatalog
         ["responder_credential_harvest"] = "Listens on a network segment and captures credentials; cannot be scoped to one approved target IP.",
     };
 
-    public sealed record ToolEntry(string Name, string Category, string Tier, string Status, string Description, string Reason, bool Runnable);
+    // Tools that can never run in an IP-scoped lab regardless of gateway connection:
+    // wrong package, missing privileges/binary, composite workflows, or cloud/credential scope.
+    private static readonly HashSet<string> HardBlocked = new()
+    {
+        "httpx_probe", "masscan_high_speed", "rustscan_fast_scan", "responder_credential_harvest", "comprehensive_api_audit",
+    };
+
+    /// <param name="State">
+    /// Authorization/readiness state the application assigns, independent of mere tool presence.
+    /// Offline this is one of: <c>available</c> (a reviewed, bounded adapter exists — runnable once the
+    /// gateway connects), <c>needs_setup</c> (advertised; requires a reviewed adapter and/or extra context
+    /// before it can run), or <c>blocked</c> (cannot run in this lab model at all). A connected gateway
+    /// refines these with live facts: <c>discovered</c>/<c>unavailable</c> (manifest presence and installed
+    /// binary) and <c>authorized</c> (available AND permitted for the caller's approved target).
+    /// </param>
+    public sealed record ToolEntry(string Name, string Category, string Tier, string Status, string Description, string Reason, bool Runnable, string State);
+
+    private static string OfflineState(string name, string category, bool reviewed) =>
+        reviewed ? "available"
+        : category == "Cloud" || HardBlocked.Contains(name) ? "blocked"
+        : "needs_setup";
 
     public static IReadOnlyList<ToolEntry> Tools()
     {
@@ -80,7 +101,7 @@ public static class HexStrikeCatalog
             {
                 if (Presets.TryGetValue(name, out var preset))
                 {
-                    entries.Add(new ToolEntry(name, preset.Category, preset.Tier, "reviewed", preset.Description, "", true));
+                    entries.Add(new ToolEntry(name, preset.Category, preset.Tier, "reviewed", preset.Description, "", true, OfflineState(name, preset.Category, true)));
                 }
                 else
                 {
@@ -88,7 +109,7 @@ public static class HexStrikeCatalog
                         ? "Cloud account/cluster authorization is not represented by a lab IP; execution unavailable."
                         : Reasons.GetValueOrDefault(name, "Needs a reviewed execution adapter and the appropriate target scope.");
                     entries.Add(new ToolEntry(name, groupCategory, "unclassified", "advertised",
-                        "Advertised by the tool manifest; no reviewed run-adapter yet.", reason, false));
+                        "Advertised by the tool manifest; no reviewed run-adapter yet.", reason, false, OfflineState(name, groupCategory, false)));
                 }
             }
         }

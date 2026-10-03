@@ -17,6 +17,7 @@ def extra_arguments(name,folder,target,url):
  'feroxbuster_scan':dict(url=url,wordlist=wordlist,threads=1,additional_args='--no-recursion --dont-extract-links --rate-limit 5 --time-limit 90s --timeout 5 --silent'),
  'dirsearch_scan':dict(url=url,wordlist=wordlist,threads=1,recursive=False,extensions='html,txt,json',additional_args='--max-rate 5 --max-time 90 --timeout 5'),
  'wafw00f_scan':dict(target=url,additional_args='--noredirect --timeout 5'),
+ 'katana_crawl':dict(url=url,additional_args='-depth 1 -concurrency 1 -rate-limit 5 -timeout 5 -no-color -silent -disable-update-check -headless=false -js-crawl=false'),
  'arjun_parameter_discovery':dict(url=url,method='GET',wordlist=params.as_posix(),delay=1,threads=1,stable=True,additional_args='--disable-redirects -T 5'),
  'arjun_scan':dict(url=url,method='GET',additional_args='-w '+params.as_posix()+' -t 1 -d 1 --stable --disable-redirects -T 5'),
  'enum4linux_scan':dict(target=target,additional_args='-U -G -S'),

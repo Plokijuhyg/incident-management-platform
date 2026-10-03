@@ -73,3 +73,19 @@ class SelectionTests(unittest.TestCase):
    api=extra_arguments('api_fuzzer',folder,target,url);self.assertEqual(api['methods'],'GET')
  def test_api_nested_failure_is_not_reported_as_success(self):
   self.assertFalse(response_success('api_fuzzer',dict(success=True,results=[dict(result=dict(success=False,return_code=1))]*3)))
+ def test_poc_tool_runs_through_the_same_generic_path(self):
+  # A newly-added preset (katana_crawl) executes through run_selected's generic MCP
+  # call loop with no tool-specific execution code — only a bounded argument adapter.
+  self.assertIn('katana_crawl',PRESETS)
+  cap=catalog([dict(name=n,inputSchema={}) for n in ('katana_crawl',)],dict(tools_status=dict(katana=True)))
+  value=dict(categories=['Web'],selectedTools=['katana_crawl'],manifestId=cap['manifestId'],confirmed=True,webPort=8080,webHttps=False,webPath='/')
+  self.assertEqual(resolve(value,cap)['selectedTools'],['katana_crawl'])
+  with tempfile.TemporaryDirectory() as temp:
+   calls=[]
+   def invoke(v):calls.append(v);return dict(success=True,return_code=0)
+   result,status=run_selected(Path(temp),'192.168.207.129',value,invoke)
+   self.assertEqual(status,'Completed')
+   self.assertEqual([c['name'] for c in calls],['katana_crawl'])
+   self.assertEqual(calls[0]['operation'],'call')
+   self.assertEqual(calls[0]['arguments']['url'],'http://192.168.207.129:8080/')
+   self.assertIn('-depth 1',calls[0]['arguments']['additional_args'])
