@@ -102,7 +102,9 @@ public class HexStrikeCatalogApiTests : IClassFixture<TestApiFactory>
             Assert.Equal(24, response.reviewedTotal);
             Assert.True(response.total >= 55);
             Assert.Equal(response.total, response.reviewedTotal + response.advertisedTotal);
-            Assert.Contains(response.tools, t => t.Name == "nmap_scan" && t.Runnable);
+            Assert.Contains(response.tools, t => t.Name == "nmap_scan" && t.Runnable && t.State == "available");
+            Assert.Contains(response.tools, t => t.Name == "sqlmap_scan" && !t.Runnable && t.State == "needs_setup");
+            Assert.Contains(response.tools, t => t.State == "blocked");
 
             Assert.Equal(HttpStatusCode.Forbidden, (await analyst.GetAsync("/api/assessments/catalog")).StatusCode);
         }

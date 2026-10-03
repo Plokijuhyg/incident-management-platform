@@ -2,6 +2,7 @@ import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { InfoPopup } from '../../shared/components/detail-modal';
+import { toolStateView, TOOL_STATE_STYLES } from './tool-state';
 
 interface ToolEntry {
   name: string;
@@ -11,6 +12,7 @@ interface ToolEntry {
   description: string;
   reason: string;
   runnable: boolean;
+  state: string; // backend-computed: available | needs_setup | blocked | unavailable
 }
 interface Catalog {
   enabled: boolean;
@@ -51,12 +53,17 @@ interface Catalog {
       @if (catalog(); as c) {
         @if (!c.enabled) {
           <p class="notice">
-            The Kali gateway is not connected (Laptop 2 not configured). This catalog is
-            informational; install the tools on Kali and connect the gateway to run the reviewed
+            The Kali gateway is not connected (Laptop 2 not configured). Live availability cannot be
+            verified while the gateway is disconnected; states below reflect the application policy,
+            not a live probe. Install the tools on Kali and connect the gateway to run the available
             checks.
           </p>
         }
-        <p class="muted small-text">Choose a category to view its tools.</p>
+        <p class="muted small-text">
+          Choose a category to view its tools. <strong>Available</strong> = a reviewed, bounded
+          adapter exists; <strong>Needs setup</strong> = known to HexStrike but not yet executable
+          here; <strong>Blocked</strong> = cannot run in this lab model.
+        </p>
         @for (category of c.categories; track category) {
           <div class="catalog-category">
             <button
@@ -77,22 +84,17 @@ interface Catalog {
                   <div class="tool-card" [class.advertised]="!tool.runnable">
                     <div class="tool-card-top">
                       <code>{{ tool.name }}</code>
-                      @if (tool.runnable) {
-                        <span
-                          class="badge"
-                          [class.severity-0]="tool.tier === 'safe'"
-                          [class.severity-2]="tool.tier !== 'safe'"
-                        >
-                          {{ tool.tier === 'safe' ? 'Standard' : 'Confirm' }}
-                        </span>
-                      } @else {
-                        <span class="badge neutral">Needs setup</span>
-                      }
+                      <span class="tool-state {{ stateView(tool).cls }}">{{ stateView(tool).label }}</span>
                     </div>
                     <p class="tool-desc">{{ tool.description }}</p>
-                    @if (!tool.runnable && tool.reason) {
-                      <app-info-popup title="{{ tool.name }} — why it cannot run yet">
-                        <span popupTrigger class="link-button">Why unavailable</span>
+                    @if (tool.runnable) {
+                      <p class="muted small-text">
+                        {{ tool.tier === 'safe' ? 'Standard check' : 'Confirmation required' }} · runs once the
+                        gateway is connected.
+                      </p>
+                    } @else if (tool.reason) {
+                      <app-info-popup title="{{ tool.name }} — why it is not executable">
+                        <span popupTrigger class="link-button">Why {{ stateView(tool).label.toLowerCase() }}</span>
                         <p>{{ tool.reason }}</p>
                       </app-info-popup>
                     }
@@ -179,7 +181,11 @@ interface Catalog {
         margin: 0 0 6px;
         color: #30353b;
       }
+      .tool-card-top {
+        gap: 8px;
+      }
     `,
+    TOOL_STATE_STYLES,
   ],
 })
 export class ToolCatalog {
@@ -197,6 +203,9 @@ export class ToolCatalog {
   }
   protected byCategory(category: string): ToolEntry[] {
     return this.tools().filter((t) => t.category === category);
+  }
+  protected stateView(tool: ToolEntry) {
+    return toolStateView(tool.state);
   }
   protected isExpanded(category: string): boolean {
     return this.expanded().has(category);

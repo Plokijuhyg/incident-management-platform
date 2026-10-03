@@ -458,15 +458,15 @@ try {
           benchmark:{platform:'Windows 11',profile:'Level 1 proposed',status:'Not assessed',version:null,reference:'https://www.cisecurity.org/benchmark/microsoft_windows_desktop',reason:'Configuration evidence is required.'}
         };
         else if (path === '/api/assessments/catalog') body = {enabled:false,categories:['Network','Web','Cloud','API'],reviewedTotal:21,advertisedTotal:38,total:59,note:'Reviewed tools can run once the gateway is connected.',tools:[
-          {name:'nmap_scan',category:'Network',tier:'safe',status:'reviewed',description:'TCP service inventory.',reason:'',runnable:true},
-          {name:'sqlmap_scan',category:'Web',tier:'unclassified',status:'advertised',description:'Advertised by the tool manifest; no reviewed run-adapter yet.',reason:'Needs an explicit parameterized request.',runnable:false},
-          {name:'prowler_scan',category:'Cloud',tier:'unclassified',status:'advertised',description:'Advertised by the tool manifest; no reviewed run-adapter yet.',reason:'Cloud authorization is not a lab IP.',runnable:false},
-          {name:'api_fuzzer',category:'API',tier:'intrusive',status:'reviewed',description:'GET-only API checks.',reason:'',runnable:true}]};
+          {name:'nmap_scan',category:'Network',tier:'safe',status:'reviewed',description:'TCP service inventory.',reason:'',runnable:true,state:'available'},
+          {name:'sqlmap_scan',category:'Web',tier:'unclassified',status:'advertised',description:'Advertised by the tool manifest; no reviewed run-adapter yet.',reason:'Needs an explicit parameterized request.',runnable:false,state:'needs_setup'},
+          {name:'prowler_scan',category:'Cloud',tier:'unclassified',status:'advertised',description:'Advertised by the tool manifest; no reviewed run-adapter yet.',reason:'Cloud authorization is not a lab IP.',runnable:false,state:'blocked'},
+          {name:'api_fuzzer',category:'API',tier:'intrusive',status:'reviewed',description:'GET-only API checks.',reason:'',runnable:true,state:'available'}]};
         else if (path === '/api/assessments/capabilities')
           body = assessmentConnected ? {
             connected:true, message:'Live MCP fixture',profiles:[],manifestId:'fixture',tools:[
-              {name:'nikto_scan',category:'Web',tier:'intrusive',available:true,description:'Bounded web checks',reason:''},
-              {name:'graphql_scanner',category:'API',tier:'unclassified',available:false,description:'GraphQL',reason:'No reviewed adapter'}
+              {name:'nikto_scan',category:'Web',tier:'intrusive',available:true,description:'Bounded web checks',reason:'',discovered:true,authorized:true,state:'available'},
+              {name:'graphql_scanner',category:'API',tier:'unclassified',available:false,description:'GraphQL',reason:'No reviewed adapter',discovered:true,authorized:false,state:'needs_setup'}
             ]
           } : {connected:false,message:'Not configured. Laptop 2 is not available yet.',profiles:[],tools:[]};
         else if (path === '/api/assessments/targets') body = [{id:'lab',name:'Approved lab',ip:'192.168.207.129'}];
@@ -879,6 +879,8 @@ try {
   await until(() => textHas('Supported tools'), 'Tool catalog missing');
   await evaluate(`Array.from(document.querySelectorAll('app-tool-catalog .catalog-toggle')).find(b=>b.textContent.includes('Network')).click()`);
   await until(() => textHas('nmap_scan'), 'Tool catalog category did not expand');
+  await until(() => textHas('Available'), 'Tool catalog state badge missing');
+  assert(await evaluate(`!!document.querySelector('app-tool-catalog .tool-state.state-available')`), 'Tool state badge not styled by backend state');
   await until(
     () => textHas('Gateway unavailable'),
     'Disconnected gateway status missing',

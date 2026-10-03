@@ -16,8 +16,8 @@ it('shows live tools, blocks unavailable tools and submits only the selected sco
  http.expectOne('/api/assessments/catalog').flush({enabled:false,categories:[],reviewedTotal:0,advertisedTotal:0,total:0,note:'',tools:[]});
  http.expectOne('/api/assessments/targets').flush([{id:'lab',name:'Lab',ip:'192.168.207.129'}]);
  http.expectOne('/api/assessments/capabilities').flush({connected:true,message:'Live',profiles:[],manifestId:'manifest',tools:[
-  {name:'nikto_scan',category:'Web',tier:'intrusive',available:true,description:'Bounded web checks',reason:''},
-  {name:'new_cloud_tool',category:'Cloud',tier:'unclassified',available:false,description:'Live tool',reason:'Scope not configured'}
+  {name:'nikto_scan',category:'Web',tier:'intrusive',available:true,description:'Bounded web checks',reason:'',discovered:true,authorized:true,state:'available'},
+  {name:'new_cloud_tool',category:'Cloud',tier:'unclassified',available:false,description:'Live tool',reason:'Scope not configured',discovered:true,authorized:false,state:'blocked'}
  ]});
  const page=fixture.componentInstance as unknown as {target:string;confirmed:boolean;toggleCategory(c:string):void;toggleTool(n:string):void;start():void};
  page.target='lab';page.toggleCategory('Cloud');fixture.detectChanges();
@@ -25,8 +25,13 @@ it('shows live tools, blocks unavailable tools and submits only the selected sco
  const disabled=fixture.nativeElement.querySelector('.scan-tool input') as HTMLInputElement;
  expect(disabled.disabled).toBe(true);
  expect(fixture.nativeElement.textContent).toContain('new_cloud_tool');
+ // Blocked tool is shown (not hidden) with its state, but cannot be selected.
+ expect(fixture.nativeElement.textContent).toContain('Blocked');
  fixture.nativeElement.querySelector('dialog header button').click();fixture.detectChanges();
- page.toggleCategory('Cloud');page.toggleCategory('Web');page.toggleTool('nikto_scan');page.start();
+ page.toggleCategory('Cloud');page.toggleCategory('Web');fixture.detectChanges();
+ // Available tool shows its state badge and is selectable.
+ expect(fixture.nativeElement.textContent).toContain('Available');
+ page.toggleTool('nikto_scan');page.start();
  http.expectNone('/api/assessments/scan');
  page.confirmed=true;page.start();
  const request=http.expectOne('/api/assessments/scan');

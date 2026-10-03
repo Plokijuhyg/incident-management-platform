@@ -4,6 +4,7 @@ import { AssessmentAnalysisPanel } from './assessment-analysis';
 import { InfoPopup } from '../../shared/components/detail-modal';
 import { DetailModal } from '../../shared/components/detail-modal';
 import { ToolCatalog } from './tool-catalog';
+import { toolStateView, TOOL_STATE_STYLES } from './tool-state';
 import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
@@ -18,7 +19,7 @@ interface Target {
   name: string;
   ip: string;
 }
-interface ScanTool { name: string; category: string | null; tier: string; available: boolean; reason: string; description: string; }
+interface ScanTool { name: string; category: string | null; tier: string; available: boolean; reason: string; description: string; state?: string; discovered?: boolean; authorized?: boolean; }
 interface Capability {
   tools?: ScanTool[];
   manifestId?: string;
@@ -43,6 +44,7 @@ interface Assessment {
 @Component({
   imports: [AssessmentAnalysisPanel,InfoPopup,DetailModal,FormsModule, ErrorNotice, ToolCatalog],
   styleUrl: './assessments.css',
+  styles: [TOOL_STATE_STYLES],
   template: `
     <div class="page-heading">
       <div>
@@ -89,7 +91,7 @@ interface Assessment {
                 @for (tool of readyTools(category); track tool.name) {
                   <label class="scan-tool" [class.checked]="selectedTools.includes(tool.name)">
                     <input type="checkbox" [checked]="selectedTools.includes(tool.name)" (change)="toggleTool(tool.name)" />
-                    <span class="tool-copy"><span class="tool-title">{{ toolLabel(tool.name) }}</span><span class="tool-tier" [class.caution]="tool.tier !== 'safe'">{{ tool.tier === 'safe' ? 'Standard check' : 'Confirmation required' }}</span><small>{{ tool.description }}</small><code>{{ tool.name }}</code></span>
+                    <span class="tool-copy"><span class="tool-title">{{ toolLabel(tool.name) }} <span class="tool-state {{ stateView(tool).cls }}">{{ stateView(tool).label }}</span></span><span class="tool-tier" [class.caution]="tool.tier !== 'safe'">{{ tool.tier === 'safe' ? 'Standard check' : 'Confirmation required' }}</span><small>{{ tool.description }}</small><code>{{ tool.name }}</code></span>
                   </label>
                 }
               </div>
@@ -97,7 +99,7 @@ interface Assessment {
               @if (unavailableTools(category).length) {
                 <app-info-popup title="{{ unavailableTools(category).length }} unavailable tools &mdash; view reasons"><span popupTrigger>{{ unavailableTools(category).length }} unavailable tools &mdash; view reasons</span>
                   @for (tool of unavailableTools(category); track tool.name) {
-                    <label class="scan-tool unavailable"><input type="checkbox" disabled /><span class="tool-copy"><strong>{{ toolLabel(tool.name) }}</strong><small>{{ tool.reason }}</small><code>{{ tool.name }}</code></span></label>
+                    <label class="scan-tool unavailable"><input type="checkbox" disabled /><span class="tool-copy"><strong>{{ toolLabel(tool.name) }} <span class="tool-state {{ stateView(tool).cls }}">{{ stateView(tool).label }}</span></strong><small>Discovered in HexStrike, not executable here. {{ tool.reason }}</small><code>{{ tool.name }}</code></span></label>
                   }
                 </app-info-popup>
               }
@@ -285,6 +287,8 @@ export class AssessmentsPage {
   protected categoryTools(category: string) { return (this.capability()?.tools || []).filter(t => t.category === category); }
   protected readyTools(category: string) { return this.categoryTools(category).filter(t => t.available); }
   protected unavailableTools(category: string) { return this.categoryTools(category).filter(t => !t.available); }
+  // Display only: the state string comes from the gateway; the UI never recomputes it.
+  protected stateView(tool: ScanTool) { return toolStateView(tool.state ?? (tool.available ? 'available' : 'needs_setup')); }
   protected toolLabel(name: string) { return name.replaceAll('_', ' ').replace(/\b(scan|analyze|probe)$/, '').trim(); }
   protected categoryDescription(category: string) { return ({ Network: 'Ports, services & SMB', Web: 'Websites & application checks', Cloud: 'Cloud accounts & clusters', API: 'Endpoints & API schemas' } as Record<string,string>)[category]; }
   protected privateIp(value: string) { const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec((value || '').trim()); if (!m) return false; const b = m.slice(1).map(Number); if (b.some(n => n > 255)) return false; return b[0] === 10 || (b[0] === 172 && b[1] >= 16 && b[1] <= 31) || (b[0] === 192 && b[1] === 168); }
