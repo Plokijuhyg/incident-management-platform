@@ -20,7 +20,7 @@ This maps executable product capabilities to UI entry points. Test code, migrati
 | Generic log ingestion (syslog/firewall/VPN/API) → parse → normalize → enrich → detect | Logs page (managers/admins); `POST /api/logs/ingest` with a pre-shared key; IOC enrichment and built-in rules raise alerts |
 | Alert correlation → automatic case creation | Background `CorrelationEngine`: groups related alerts by entity into Tier-1 cases (`IncidentSource.Correlation`); no UI action needed |
 | Case workflow: Tier 1/2/3, SLA targets, escalation | Incidents page (Tier column/filter, SLA breach badge) and incident detail (Escalate action); `POST /api/incidents/{id}/escalate` |
-| UEBA: per-user baselines and anomaly alerts | UEBA page (managers/admins); `GET /api/ueba/entities`; failed-login spike and new-source-IP anomalies feed correlation |
+| UEBA: per-user baselines and anomaly alerts | UEBA page (managers/admins); `GET /api/ueba/entities`; failed-login spike and new-source-IP anomalies feed correlation. Baselines fold from both the ingested `LogEvents` store and live Windows sign-ins (4624/4625); forward-looking, no backfill |
 | HexStrike/Ollama health checks | Lab connections; health is not proof of assessment readiness |
 | Rule-based incident automation and standards evidence | Automation & coverage: versioned policies, observed/promoted decisions, NIST/CIS/ISO support and explicit benchmark gaps |
 | Curated detection baseline (enable supported High/Critical rules, suppress noise) | Automation & coverage → Detection baseline: one-click apply in Observe mode; `GET`/`POST /api/detection-rules/baseline`. Excludes Sysmon-only rules (no Sysmon channel collected) |

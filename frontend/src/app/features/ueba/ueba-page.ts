@@ -50,7 +50,7 @@ interface EntityDetail extends Entity {
         <p class="eyebrow">BEHAVIOR ANALYTICS</p>
         <h1>UEBA</h1>
         <p class="muted small-text">
-          Per-entity baselines from ingested logs. Anomalies (failed-login spikes, logins from new
+          Per-entity baselines from ingested logs and live Windows sign-ins (4624/4625). Anomalies (failed-login spikes, logins from new
           sources) raise an entity's risk and open alerts that feed correlation. A lead, not a
           verdict.
         </p>
@@ -112,8 +112,9 @@ interface EntityDetail extends Entity {
           <div class="empty-state">
             <h2>No entities tracked yet</h2>
             <p>
-              UEBA builds baselines from ingested logs that carry a user. Forward authentication
-              logs to populate it.
+              UEBA builds baselines from ingested logs that carry a user and from Windows Security
+              sign-in events (4624/4625). Forward authentication logs, or let the Windows collector
+              run, to populate it. It is forward-looking, so entities appear from new activity only.
             </p>
           </div>
         }
