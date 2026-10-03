@@ -17,6 +17,9 @@ public class IncidentQuery
     public IncidentSource? Source { get; set; }
     public int? AssignedToId { get; set; }
     public bool Unassigned { get; set; }
+    public int? Tier { get; set; }
+    /// <summary>Open cases past their SLA target.</summary>
+    public bool SlaBreached { get; set; }
     /// <summary>Excludes Resolved, Closed and FalsePositive (same definition as the dashboard).</summary>
     public bool OpenOnly { get; set; }
     /// <summary>Matches title, incident number and description.</summary>
@@ -42,6 +45,8 @@ public class IncidentSummaryResponse
     public IncidentStatus Status { get; set; }
     public IncidentCategory Category { get; set; }
     public string? AssignedToName { get; set; }
+    public int Tier { get; set; }
+    public DateTime? SlaDueAt { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 
@@ -72,7 +77,18 @@ public class IncidentDetailResponse
     public DateTime? ResolvedAt { get; set; }
     public DateTime? ClosedAt { get; set; }
     public string? ResolutionSummary { get; set; }
+    public int Tier { get; set; }
+    public DateTime? EscalatedAt { get; set; }
+    public DateTime? SlaDueAt { get; set; }
+    public string? CorrelationKey { get; set; }
     public int Version { get; set; }
+}
+
+public sealed class EscalateIncidentRequest
+{
+    public int Tier { get; set; }
+    public int? AssignedToId { get; set; }
+    public string? Note { get; set; }
 }
 
 public class IncidentCreateRequest

@@ -112,6 +112,7 @@ export class Shell {
       manager: true,
     },
     { path: '/logs', label: 'Logs', icon: 'audit', admin: false, manager: true },
+    { path: '/ueba', label: 'UEBA', icon: 'users', admin: false, manager: true },
     { path: '/automation', label: 'Automation & coverage', icon: 'audit', admin: false, manager: true },
     { path: '/assessments', label: 'Assessments', icon: 'lab', admin: false, manager: true },
     { path: '/iocs', label: 'Indicators', icon: 'iocs', admin: false },

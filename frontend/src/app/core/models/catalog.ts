@@ -9,6 +9,8 @@ export const alertSources = [
   'Manual',
   'PenTest',
   'WindowsEvent',
+  'VPN',
+  'UEBA',
 ];
 export const alertStatuses = ['New', 'In review', 'False positive', 'Promoted', 'Closed'];
 export const iocTypes = [

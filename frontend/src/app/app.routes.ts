@@ -42,6 +42,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/logs/logs-page').then((m) => m.LogsPage),
       },
       {
+        path: 'ueba',
+        title: 'UEBA | Incident Platform',
+        canActivate: [managerGuard],
+        loadComponent: () => import('./features/ueba/ueba-page').then((m) => m.UebaPage),
+      },
+      {
         path: 'dashboard',
         title: 'Dashboard | Incident Platform',
         loadComponent: () => import('./features/dashboard/dashboard').then((m) => m.Dashboard),

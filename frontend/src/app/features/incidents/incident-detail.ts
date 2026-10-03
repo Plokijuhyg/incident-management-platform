@@ -57,7 +57,9 @@ import { SeverityBadge } from '../../shared/components/severity-badge';
       @if (incident.recommendedActions?.length) {
         <section class="panel panel-padding">
           <h2>Recommended response</h2>
-          <p class="notice">Suggestion only. Human review is required; no action has been executed.</p>
+          <p class="notice">
+            Suggestion only. Human review is required; no action has been executed.
+          </p>
           @for (action of incident.recommendedActions; track action.alertId) {
             <p>{{ action.text }}</p>
             <small>Source alert #{{ action.alertId }} &middot; {{ action.ruleId }}</small>
@@ -109,6 +111,30 @@ import { SeverityBadge } from '../../shared/components/severity-badge';
             <dd>{{ sources.at(incident.source) ?? 'Unknown' }}</dd>
             <dt>Assigned to</dt>
             <dd>{{ incident.assignedToName || 'Unassigned' }}</dd>
+            <dt>Tier</dt>
+            <dd>
+              Tier {{ incident.tier }}
+              @if (incident.escalatedAt) {
+                <span class="muted small-text"
+                  >(escalated {{ incident.escalatedAt | date: 'short' }})</span
+                >
+              }
+            </dd>
+            <dt>SLA target</dt>
+            <dd>
+              @if (incident.slaDueAt) {
+                {{ incident.slaDueAt | date: 'medium' }}
+                @if (incident.status < 6 && breached(incident.slaDueAt)) {
+                  <span class="badge severity-3">Breached</span>
+                }
+              } @else {
+                —
+              }
+            </dd>
+            @if (incident.correlationKey) {
+              <dt>Correlation</dt>
+              <dd class="break-word">{{ incident.correlationKey }}</dd>
+            }
             <dt>Last updated</dt>
             <dd>{{ incident.updatedAt | date: 'medium' }}</dd>
           </dl>
@@ -171,6 +197,9 @@ export class IncidentDetailPage {
     ),
     { initialValue: { loading: true, data: null, errors: [] } as LoadState<IncidentDetail> },
   );
+  protected breached(slaDueAt: string): boolean {
+    return new Date(slaDueAt).getTime() < Date.now();
+  }
   protected milestones(i: IncidentDetail) {
     return [
       { label: 'Occurred', time: i.occurredAt },

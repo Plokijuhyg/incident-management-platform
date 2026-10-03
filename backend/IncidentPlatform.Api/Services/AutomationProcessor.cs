@@ -91,7 +91,8 @@ public sealed class AutomationProcessor(AppDbContext db)
                         Severity=imported is null?IncidentSeverity.High:Enum.TryParse<IncidentSeverity>(imported.Severity,out var sigmaSeverity)?sigmaSeverity:IncidentSeverity.Low,
                         Priority=imported?.Severity is "Low" or "Informational"?IncidentPriority.Low:imported?.Severity=="Medium"?IncidentPriority.Medium:IncidentPriority.High,Category=ruleId=="WIN-DEFENDER-DETECTION"?IncidentCategory.Malware:IncidentCategory.Other,
                         Status=IncidentStatus.New,Source=IncidentSource.WindowsEvent,CreatedById=policy.ApprovedById!.Value,
-                        AssignedToId=policy.OwnerId,DetectedAt=alert.DetectedAt,CreatedAt=now,UpdatedAt=now };
+                        AssignedToId=policy.OwnerId,DetectedAt=alert.DetectedAt,CreatedAt=now,UpdatedAt=now,
+                        Tier=1,SlaDueAt=CaseSla.DueAt(imported is null?IncidentSeverity.High:Enum.TryParse<IncidentSeverity>(imported.Severity,out var sev)?sev:IncidentSeverity.Low,now) };
                     db.Incidents.Add(incident);await db.SaveChangesAsync(ct);
                 }
                 if(created && imported is not null)await SigmaIncidentReferences.CopyAsync(db,alert,incident!.Id,policy.ApprovedById!.Value,ct);

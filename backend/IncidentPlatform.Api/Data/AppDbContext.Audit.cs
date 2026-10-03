@@ -45,7 +45,9 @@ public partial class AppDbContext
         var pending = ChangeTracker.Entries()
             // LogEvent is high-volume ingested telemetry; it is covered by a single
             // per-batch summary audit row, not one row per line (see LogIngestionService).
-            .Where(e => e.Entity is not AuditLog and not RefreshToken and not IncidentNumberSequence and not LogEvent &&
+            // EntityProfile is high-churn UEBA baseline state; it is covered by anomaly
+            // alerts and the UEBA views, not a row per rolling update.
+            .Where(e => e.Entity is not AuditLog and not RefreshToken and not IncidentNumberSequence and not LogEvent and not EntityProfile &&
                 e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
             .Select(e => new
             {

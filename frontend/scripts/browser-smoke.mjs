@@ -110,6 +110,10 @@ try {
     resolvedAt: null,
     closedAt: null,
     resolutionSummary: null,
+    tier: 1,
+    escalatedAt: null,
+    slaDueAt: '2026-09-24T09:00:00',
+    correlationKey: null,
     version: 0,
   };
   let adminSession = false;
@@ -334,6 +338,9 @@ try {
             ];
             body = evidenceFiles[0];
           } else body = evidenceFiles;
+        } else if (/\/incidents\/\d+\/escalate$/.test(path)) {
+          detail = { ...detail, tier: payload.tier, escalatedAt: '2026-09-24T09:00:00', version: detail.version + 1 };
+          body = detail;
         } else if (/\/incidents\/\d+\/(assign|status|close)$/.test(path)) {
           if (path.endsWith('/assign'))
             detail = {
@@ -425,6 +432,10 @@ try {
         else if (path === '/api/soc/techniques/1/incidents') body = [{id:42,incidentNumber:'INC-FIXTURE',title:'Fixture investigation',severity:2,status:0}];
         else if (path === '/api/soc/tasks') body = {total:1,items:[{id:1,incidentId:42,incidentNumber:'INC-FIXTURE',actionType:10,description:'Restore lab service',targetValue:'Fixture host',status:0,result:null,owner:'Fixture owner'}]};
         else if (path === '/api/soc/analytics') body = {observedAt:new Date().toISOString(),start:new Date(Date.now()-3600000).toISOString(),width:1,total:1,series:[{index:30,count:1}],items:[{id:1,receivedAt:new Date().toISOString(),machine:'Fixture SOC host',provider:'Fixture provider',channel:'Application',eventId:1000,level:4,message:'Fixture raw message'}],hasMore:false};
+        else if (path === '/api/ueba/entities') body = {total:2,withAnomalies:1,items:[
+          {id:1,entityType:'user',entityValue:'svc_backup',riskScore:60,failedLoginsHour:5,eventCount:40,lastAnomaly:'Failed-login spike',lastAnomalyAt:'2026-09-24T08:30:00Z',firstSeenAt:'2026-09-20T00:00:00Z',lastSeenAt:'2026-09-24T08:30:00Z'},
+          {id:2,entityType:'user',entityValue:'jdoe',riskScore:0,failedLoginsHour:0,eventCount:120,lastAnomaly:null,lastAnomalyAt:null,firstSeenAt:'2026-09-18T00:00:00Z',lastSeenAt:'2026-09-24T08:00:00Z'}]};
+        else if (path === '/api/ueba/entities/1') body = {id:1,entityType:'user',entityValue:'svc_backup',riskScore:60,failedLoginsHour:5,eventCount:40,lastAnomaly:'Failed-login spike',lastAnomalyAt:'2026-09-24T08:30:00Z',firstSeenAt:'2026-09-20T00:00:00Z',lastSeenAt:'2026-09-24T08:30:00Z',knownSourceIps:['203.0.113.9','203.0.113.10'],knownSourceIpCount:2,recentAlerts:[{id:11,title:'UEBA: Failed-login spike — svc_backup',severity:'High',status:0,incidentId:null,detectedAt:'2026-09-24T08:30:00Z'}]};
         else if (path === '/api/detection-rules/baseline') body = {recommendedTotal:135,recommendedEnabled:0,recommendedDisabled:135,noisyEnabled:1,enabledTotal:2,importedTotal:2607,note:'Recommended = supported, mapped to a collected Windows channel, High or Critical, excluding known-noisy rules.',items:[{id:1,externalRuleId:'10000000-0000-4000-8000-000000000001',title:'Failed logons (brute force)',severity:'High',service:'security',enabled:false}]};
         else if (path === '/api/detection-rules/baseline/apply' && request.method === 'POST') body = {recommendedTotal:135,enabled:135,alreadyEnabled:0,disabled:1,alertsSuppressed:89};
         else if (path === '/api/detection-rules') body = {total:1,page:1,items:[{id:1,externalRuleId:'10000000-0000-4000-8000-000000000001',title:'Sigma review fixture',severity:'High',referenceTag:'attack.t1110',enabled:false,updatedAt:'2026-09-27T10:00:00Z',unsupportedReason:null,definition:{logsource:{product:'windows',service:'security'},detection:{selection:{EventID:4625},condition:'selection'},tags:['attack.t1110'],sourceFile:'fixture.yml',sourceSha256:'fixture',description:'Failed login fixture',falsepositives:['Authorized lab activity']}}]};
@@ -677,6 +688,11 @@ try {
   await selectIndex('incident-status', 2);
   await submitForm();
   await until(() => textHas('Status updated.'), 'Status update failed.');
+  await clickButton('Escalate (Tier 1)');
+  await until(() => evaluate(`!!document.getElementById('escalate-tier')`), 'Escalate form missing.');
+  await selectIndex('escalate-tier', 1);
+  await clickButton('Confirm escalation');
+  await until(() => textHas('Case escalated.'), 'Escalation failed.');
   await evaluate(
     `{ const transfer = new DataTransfer(); transfer.items.add(new File(['browser log content'], 'browser.log', { type: 'text/plain' })); const input = document.getElementById('evidence-file'); input.files = transfer.files; input.dispatchEvent(new Event('change', { bubbles: true })); }`,
   );
@@ -760,6 +776,11 @@ try {
     await evaluate(`document.querySelector('nav a[href="${path}"]').click()`);
     await until(() => textHas(text), `${path} did not render.`);
   };
+  await go('/ueba', 'svc_backup');
+  await until(() => textHas('Failed-login spike'), 'UEBA anomaly missing');
+  await evaluate(`Array.from(document.querySelectorAll('.queue-table tbody tr')).find(r=>r.textContent.includes('svc_backup')).click()`);
+  await until(() => textHas('Known source IPs'), 'UEBA entity detail missing');
+  await screenshot('browser-ueba');
   await go('/alerts', 'Lab service exposure');
   await screenshot('browser-alerts');
   await evaluate(`document.querySelector('a[href="/alerts/11"]').click()`);

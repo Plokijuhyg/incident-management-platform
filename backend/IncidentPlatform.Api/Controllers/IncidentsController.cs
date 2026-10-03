@@ -85,6 +85,14 @@ public class IncidentsController : ControllerBase
         return Ok(await _incidentService.CloseAsync(id, request, cancellationToken));
     }
 
+    [HttpPost("{id:int}/escalate")]
+    [Authorize(Roles = $"{RoleNames.SecurityManager},{RoleNames.Admin}")]
+    public async Task<ActionResult<IncidentDetailResponse>> Escalate(
+        int id, [FromBody] EscalateIncidentRequest request, CancellationToken cancellationToken)
+    {
+        return Ok(await _incidentService.EscalateAsync(id, request, cancellationToken));
+    }
+
     [HttpPost("{id:int}/iocs")]
     public async Task<ActionResult<LinkIocResult>> LinkIoc(
         int id, [FromBody] LinkIocToIncidentRequest request, CancellationToken cancellationToken)

@@ -462,6 +462,49 @@ public class IncidentsControllerTests : IClassFixture<TestApiFactory>
         }
     }
 
+    [Fact]
+    public async Task Escalate_raisesTierForManager_blocksAnalystAndDeEscalation()
+    {
+        var (managerEmail, _) = await CreateUserWithRoleAsync(RoleNames.SecurityManager);
+        var (analystEmail, analystId) = await CreateUserWithRoleAsync(RoleNames.SocAnalyst);
+        try
+        {
+            var manager = await AuthenticatedClientAsync(managerEmail);
+            var created = await (await manager.PostAsJsonAsync("/api/incidents", NewIncident("Escalation test")))
+                .Content.ReadFromJsonAsync<IncidentDetailResponse>();
+            Assert.Equal(1, created!.Tier);
+            Assert.NotNull(created.SlaDueAt);                 // SLA set on creation
+
+            var escalated = await manager.PostAsJsonAsync($"/api/incidents/{created.Id}/escalate",
+                new EscalateIncidentRequest { Tier = 2, AssignedToId = analystId, Note = "Needs deeper analysis" });
+            Assert.Equal(HttpStatusCode.OK, escalated.StatusCode);
+            var afterEscalation = await escalated.Content.ReadFromJsonAsync<IncidentDetailResponse>();
+            Assert.Equal(2, afterEscalation!.Tier);
+            Assert.NotNull(afterEscalation.EscalatedAt);
+            Assert.Equal(analystId, afterEscalation.AssignedToId);
+
+            // De-escalation is rejected.
+            var down = await manager.PostAsJsonAsync($"/api/incidents/{created.Id}/escalate", new EscalateIncidentRequest { Tier = 1 });
+            Assert.Equal(HttpStatusCode.BadRequest, down.StatusCode);
+
+            // Analyst cannot escalate.
+            var analyst = await AuthenticatedClientAsync(analystEmail);
+            var forbidden = await analyst.PostAsJsonAsync($"/api/incidents/{created.Id}/escalate", new EscalateIncidentRequest { Tier = 3 });
+            Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+
+            // Tier filter finds it at Tier 2, not Tier 1.
+            var tier2 = await manager.GetFromJsonAsync<PagedResult<IncidentSummaryResponse>>("/api/incidents?tier=2&search=" + created.IncidentNumber);
+            Assert.Contains(tier2!.Items, i => i.Id == created.Id && i.Tier == 2);
+            var tier1 = await manager.GetFromJsonAsync<PagedResult<IncidentSummaryResponse>>("/api/incidents?tier=1&search=" + created.IncidentNumber);
+            Assert.DoesNotContain(tier1!.Items, i => i.Id == created.Id);
+        }
+        finally
+        {
+            await CleanupUserAsync(analystEmail);
+            await CleanupUserAsync(managerEmail);
+        }
+    }
+
     private sealed class FixedUser(int id, params string[] roles) : IncidentPlatform.Api.Interfaces.ICurrentUser
     {
         public int Id => id;

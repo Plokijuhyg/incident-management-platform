@@ -21,6 +21,10 @@ public class AlertConfiguration : IEntityTypeConfiguration<Alert>
         builder.Property(a => a.DeduplicationKey).HasMaxLength(200);
         builder.Property(a => a.Severity).HasMaxLength(20).IsRequired();
 
+        builder.Property(a => a.Host).HasMaxLength(255);
+        builder.Property(a => a.Username).HasMaxLength(255);
+        builder.Property(a => a.EntityIp).HasMaxLength(45);
+
         builder.Property(a => a.Source).HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(a => a.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
 
@@ -37,6 +41,9 @@ public class AlertConfiguration : IEntityTypeConfiguration<Alert>
         builder.HasIndex(a => a.Source);
         builder.HasIndex(a => a.DetectedAt);
         builder.HasIndex(a => a.DeduplicationKey).IsUnique();
+        // Correlation scans recent New, unlinked alerts grouped by entity.
+        builder.HasIndex(a => new { a.Status, a.IncidentId, a.ReceivedAt });
+        builder.HasIndex(a => a.Host);
 
         // SET NULL, not RESTRICT or CASCADE: an alert predates and outlives
         // its incident (database-design.md §5) — if the incident is ever

@@ -44,6 +44,9 @@ import { ErrorNotice } from '../../shared/components/error-notice';
             Assign owner
           </button>
           @if (incident().status !== 7) {
+            <button class="button secondary small" [disabled]="busy()" (click)="open('escalate')">
+              Escalate (Tier {{ incident().tier }})
+            </button>
             <button class="button secondary small" [disabled]="busy()" (click)="open('close')">
               Close incident
             </button>
@@ -183,6 +186,37 @@ import { ErrorNotice } from '../../shared/components/error-notice';
         </div>
       </form>
     }
+    @if (mode() === 'escalate') {
+      <form [formGroup]="escalateForm" (ngSubmit)="saveEscalate()" novalidate>
+        <fieldset [disabled]="busy() || assigneesLoading()">
+          <legend>Escalate case</legend>
+          <label for="escalate-tier">Tier</label
+          ><select id="escalate-tier" formControlName="tier">
+            <option [ngValue]="1">Tier 1 — triage</option>
+            <option [ngValue]="2">Tier 2 — investigation</option>
+            <option [ngValue]="3">Tier 3 — incident response</option>
+          </select>
+          <label for="escalate-owner">Reassign to (optional)</label
+          ><select id="escalate-owner" formControlName="assignedToId">
+            <option [ngValue]="null">Keep current owner</option>
+            @for (user of assignees(); track user.id) {
+              <option [ngValue]="user.id">{{ user.fullName }}</option>
+            }</select
+          ><label for="escalate-note">Note (optional)</label
+          ><textarea id="escalate-note" formControlName="note" rows="3"></textarea>
+          <p class="muted small-text">
+            Escalation can only raise the tier. Current tier: {{ incident().tier }}.
+          </p>
+        </fieldset>
+        <div class="form-actions">
+          <button type="button" class="button secondary" [disabled]="busy()" (click)="cancel()">
+            Cancel</button
+          ><button class="button" [disabled]="busy()">
+            {{ busy() ? 'Escalating...' : 'Confirm escalation' }}
+          </button>
+        </div>
+      </form>
+    }
     @if (mode() === 'close') {
       <form [formGroup]="closeForm" (ngSubmit)="saveClose()" novalidate>
         <fieldset [disabled]="busy()">
@@ -221,7 +255,9 @@ export class IncidentActions implements OnChanges {
   protected readonly canEdit = computed(
     () => this.canManage() || this.auth.user()?.id === this.incident().assignedToId,
   );
-  protected readonly mode = signal<'edit' | 'status' | 'assign' | 'close' | null>(null);
+  protected readonly mode = signal<'edit' | 'status' | 'assign' | 'close' | 'escalate' | null>(
+    null,
+  );
   protected readonly busy = signal(false);
   protected readonly errors = signal<string[]>([]);
   protected readonly success = signal('');
@@ -243,6 +279,11 @@ export class IncidentActions implements OnChanges {
     category: [9],
   });
   protected readonly statusForm = this.fb.nonNullable.group({ status: [0], note: [''] });
+  protected readonly escalateForm = this.fb.nonNullable.group({
+    tier: [1],
+    assignedToId: this.fb.control<number | null>(null),
+    note: [''],
+  });
   protected readonly assignForm = this.fb.group({
     assignedToId: this.fb.control<number | null>(null, Validators.required),
   });
@@ -265,14 +306,16 @@ export class IncidentActions implements OnChanges {
     this.assignForm.reset({ assignedToId: i.assignedToId });
     this.closeForm.reset();
   }
-  protected open(mode: 'edit' | 'status' | 'assign' | 'close'): void {
+  protected open(mode: 'edit' | 'status' | 'assign' | 'close' | 'escalate'): void {
     if (this.busy()) return;
     this.resetForms();
     this.mode.set(mode);
     this.errors.set([]);
     this.success.set('');
     this.conflict.set(false);
-    if (mode === 'assign') this.loadAssignees();
+    if (mode === 'assign' || mode === 'escalate') this.loadAssignees();
+    if (mode === 'escalate')
+      this.escalateForm.reset({ tier: this.incident().tier, assignedToId: null, note: '' });
   }
   protected cancel(): void {
     this.mode.set(null);
@@ -347,6 +390,18 @@ export class IncidentActions implements OnChanges {
     const id = this.assignForm.value.assignedToId;
     if (!this.canManage() || !id || !this.assignees().some((u) => u.id === id)) return;
     this.run(this.api.assign(this.incident().id, id), 'Owner assigned.');
+  }
+  protected saveEscalate(): void {
+    if (!this.canManage()) return;
+    const value = this.escalateForm.getRawValue();
+    const assignee =
+      value.assignedToId && this.assignees().some((u) => u.id === value.assignedToId)
+        ? value.assignedToId
+        : null;
+    this.run(
+      this.api.escalate(this.incident().id, value.tier, assignee, value.note.trim() || null),
+      'Case escalated.',
+    );
   }
   protected saveClose(): void {
     this.closeForm.markAllAsTouched();

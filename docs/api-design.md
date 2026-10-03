@@ -146,14 +146,21 @@ read it.
 | POST | `/api/incidents/{id}/assign` | Manager, Admin | Assign to an analyst |
 | POST | `/api/incidents/{id}/status` | All¹ | Change status |
 | POST | `/api/incidents/{id}/close` | Manager, Admin | Close, requires resolution summary |
+| POST | `/api/incidents/{id}/escalate` | Manager, Admin | Raise the tier (1→2→3, never down) and optionally reassign |
+| GET | `/api/ueba/entities` | Manager, Admin | Entities ranked by UEBA risk score |
+| GET | `/api/ueba/entities/{id}` | Manager, Admin | One entity: baseline, known source IPs, recent anomaly alerts |
 
 ¹ Analysts may modify incidents assigned to them; managers and admins, any.
 Enforced in the service layer, not the route.
 
 **`GET /api/incidents` filters (implemented):** `status`, `severity`, `priority`,
 `category`, `source`, `assignedToId`, `unassigned=true` (not combinable with
-`assignedToId`), `openOnly=true` (excludes Resolved, Closed, FalsePositive),
+`assignedToId`), `tier` (1-3), `slaBreached=true` (open cases past `slaDueAt`),
+`openOnly=true` (excludes Resolved, Closed, FalsePositive),
 `createdFrom`, `createdTo`, `search` (title + incident number + description, max 200).
+Incidents are the SOC cases: each carries `tier`, `slaDueAt`, `escalatedAt` and, for
+correlation-opened cases, `correlationKey`. Cases open at Tier 1 with an SLA from severity
+(Critical 1h / High 4h / Medium 24h / Low 72h).
 Sorting: `sort` = `createdAt` (default) | `updatedAt` | `severity` | `priority` |
 `status` | `title` | `incidentNumber`, `direction` = `asc` | `desc`. Enum sorts follow
 severity/workflow order, not alphabetical; ties break on newest id. Unknown sort keys

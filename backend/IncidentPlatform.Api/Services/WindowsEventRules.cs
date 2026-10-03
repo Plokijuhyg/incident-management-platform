@@ -17,6 +17,7 @@ public static class WindowsEventRules
         if (rule is not { } r) return null;
         return new Alert { Title=r.Title, Description="Observed Windows event. Rule severity is a review priority, not proof of compromise. Review the original XML and context before promoting to an incident.",
             Source=AlertSource.WindowsEvent, SourceRuleId=r.Id, ExternalId=e.RecordId?.ToString(), DeduplicationKey="windows:"+e.Fingerprint,
+            Host=e.Machine,
             Severity=r.Severity, Status=AlertStatus.New, DetectedAt=e.TimeCreated??e.ReceivedAt, ReceivedAt=e.ReceivedAt,
             RawPayload=JsonSerializer.Serialize(new { e.Machine,e.Channel,e.Provider,e.EventId,e.RecordId,e.TimeCreated,e.RawXml,rule=r.Id }) };
     }
@@ -28,6 +29,7 @@ public static class WindowsEventRules
             Description="Imported Sigma detection matched validated Windows event evidence. Review the original event and false-positive context before incident promotion.",
             Source=AlertSource.WindowsEvent,SourceRuleId="SIGMA-"+rule.ExternalRuleId,
             ExternalId=e.RecordId?.ToString(),DeduplicationKey="sigma:"+rule.ExternalRuleId+":"+e.Fingerprint,
+            Host=e.Machine,
             Severity=rule.Severity,Status=AlertStatus.New,DetectedAt=e.TimeCreated??e.ReceivedAt,ReceivedAt=e.ReceivedAt,
             RawPayload=JsonSerializer.Serialize(new { e.Machine,e.Channel,e.Provider,e.EventId,e.RecordId,e.TimeCreated,e.RawXml,
                 eventFingerprint=e.Fingerprint,rule="SIGMA-"+rule.ExternalRuleId,ruleTitle=rule.Title,ruleUpdatedAt=rule.UpdatedAt,

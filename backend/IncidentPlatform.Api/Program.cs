@@ -117,6 +117,10 @@ try
     builder.Services.AddScoped<IncidentPlatform.Api.Services.Ingestion.LogIngestAccess>();
     builder.Services.AddScoped<IncidentPlatform.Api.Services.Ingestion.ILogIngestionService, IncidentPlatform.Api.Services.Ingestion.LogIngestionService>();
     builder.Services.AddScoped<IncidentPlatform.Api.Services.Ingestion.ILogQueryService, IncidentPlatform.Api.Services.Ingestion.LogQueryService>();
+    builder.Services.AddScoped<IncidentPlatform.Api.Services.Correlation.CorrelationEngine>();
+    builder.Services.AddHostedService<IncidentPlatform.Api.Services.Correlation.CorrelationWorker>();
+    builder.Services.AddScoped<IncidentPlatform.Api.Services.Ueba.UebaEngine>();
+    builder.Services.AddHostedService<IncidentPlatform.Api.Services.Ueba.UebaWorker>();
     builder.Services
         .AddOptions<CorsSettings>()
         .Bind(builder.Configuration.GetSection(CorsSettings.SectionName))

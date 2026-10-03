@@ -19,7 +19,10 @@ public enum AlertSource
     WindowsEvent,
 
     /// <summary>Raised from an ingested VPN log (see Models/LogEvent.cs).</summary>
-    Vpn
+    Vpn,
+
+    /// <summary>Raised by user/entity behavior analytics (see Services/Ueba).</summary>
+    Ueba
 }
 
 public enum AlertStatus
@@ -62,6 +65,12 @@ public class Alert
     /// without notice. This is evidence.
     /// </summary>
     public string? RawPayload { get; set; }
+
+    // Primary entities this alert concerns, populated at creation where known.
+    // They drive correlation (grouping related alerts into one case) and UEBA linkage.
+    public string? Host { get; set; }
+    public string? Username { get; set; }
+    public string? EntityIp { get; set; }
 
     public int? IncidentId { get; set; }
     public Incident? Incident { get; set; }

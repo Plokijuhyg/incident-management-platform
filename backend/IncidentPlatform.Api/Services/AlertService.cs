@@ -141,6 +141,8 @@ public class AlertService : IAlertService
             DetectedAt = alert.DetectedAt,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
+            Tier = 1,
+            SlaDueAt = CaseSla.DueAt(request.Severity, DateTime.UtcNow),
             Version = 0
         };
 

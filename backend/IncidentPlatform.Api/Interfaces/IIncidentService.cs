@@ -18,4 +18,6 @@ public interface IIncidentService
     Task<IncidentDetailResponse> ChangeStatusAsync(int id, ChangeStatusRequest request, CancellationToken cancellationToken = default);
 
     Task<IncidentDetailResponse> CloseAsync(int id, CloseIncidentRequest request, CancellationToken cancellationToken = default);
+
+    Task<IncidentDetailResponse> EscalateAsync(int id, EscalateIncidentRequest request, CancellationToken cancellationToken = default);
 }

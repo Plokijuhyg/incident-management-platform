@@ -29,6 +29,10 @@ public static class IncidentMapper
         ResolvedAt = i.ResolvedAt,
         ClosedAt = i.ClosedAt,
         ResolutionSummary = i.ResolutionSummary,
+        Tier = i.Tier,
+        EscalatedAt = i.EscalatedAt,
+        SlaDueAt = i.SlaDueAt,
+        CorrelationKey = i.CorrelationKey,
         Version = i.Version
     };
 }

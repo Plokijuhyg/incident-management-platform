@@ -27,6 +27,8 @@ export interface IncidentSummary {
   status: number;
   category: number;
   assignedToName: string | null;
+  tier: number;
+  slaDueAt: string | null;
   createdAt: string;
 }
 export interface IncidentDetail extends IncidentSummary {
@@ -44,6 +46,8 @@ export interface IncidentDetail extends IncidentSummary {
   resolvedAt: string | null;
   closedAt: string | null;
   resolutionSummary: string | null;
+  escalatedAt: string | null;
+  correlationKey: string | null;
   version: number;
 }
 export interface CreateIncident {
@@ -92,6 +96,9 @@ export const sources = [
   'Threat intelligence',
   'PenTest',
   'WindowsEvent',
+  'VPN',
+  'UEBA',
+  'Correlation',
 ];
 export type LoadState<T> = { loading: boolean; data: T | null; errors: string[] };
 export interface AlertSummary {

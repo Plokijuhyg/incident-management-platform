@@ -4,11 +4,21 @@ using IncidentPlatform.Api.Models;
 
 namespace IncidentPlatform.Api.Validators;
 
+public class EscalateIncidentRequestValidator : AbstractValidator<EscalateIncidentRequest>
+{
+    public EscalateIncidentRequestValidator()
+    {
+        RuleFor(x => x.Tier).InclusiveBetween(1, 3);
+        RuleFor(x => x.Note).MaximumLength(2000);
+    }
+}
+
 public class IncidentQueryValidator : AbstractValidator<IncidentQuery>
 {
     public IncidentQueryValidator()
     {
         RuleFor(x => x.Search).MaximumLength(200);
+        RuleFor(x => x.Tier).InclusiveBetween(1, 3).When(x => x.Tier is not null);
         RuleFor(x => x.Sort).Must(s => s is null || IncidentQuery.SortKeys.Contains(s))
             .WithMessage($"Sort must be one of: {string.Join(", ", IncidentQuery.SortKeys)}.");
         RuleFor(x => x.Direction).Must(d => d is null or "asc" or "desc").WithMessage("Direction must be asc or desc.");

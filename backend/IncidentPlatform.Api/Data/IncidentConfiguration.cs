@@ -20,6 +20,15 @@ public class IncidentConfiguration : IEntityTypeConfiguration<Incident>
         builder.Property(i => i.ResolutionSummary).HasColumnType("text");
         builder.Property(i => i.FalsePositiveReason).HasMaxLength(500);
 
+        builder.Property(i => i.Tier).HasDefaultValue(1);
+        builder.Property(i => i.EscalatedAt).HasColumnType("datetime(6)");
+        builder.Property(i => i.SlaDueAt).HasColumnType("datetime(6)");
+        builder.Property(i => i.CorrelationKey).HasMaxLength(200);
+        // Appending later alerts to an open correlated case; and the SLA-breach view.
+        builder.HasIndex(i => i.CorrelationKey);
+        builder.HasIndex(i => new { i.Status, i.SlaDueAt });
+        builder.HasIndex(i => new { i.Tier, i.Status });
+
         builder.Property(i => i.Severity).HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(i => i.Priority).HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(i => i.Status).HasConversion<string>().HasMaxLength(20).IsRequired();

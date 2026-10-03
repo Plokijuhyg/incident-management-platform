@@ -34,6 +34,13 @@ public class IncidentService : IIncidentService
         if (filter.Source is not null) query = query.Where(i => i.Source == filter.Source);
         if (filter.AssignedToId is not null) query = query.Where(i => i.AssignedToId == filter.AssignedToId);
         if (filter.Unassigned) query = query.Where(i => i.AssignedToId == null);
+        if (filter.Tier is not null) query = query.Where(i => i.Tier == filter.Tier);
+        if (filter.SlaBreached)
+        {
+            var now = DateTime.UtcNow;
+            query = query.Where(i => i.SlaDueAt != null && i.SlaDueAt < now &&
+                i.Status != IncidentStatus.Resolved && i.Status != IncidentStatus.Closed && i.Status != IncidentStatus.FalsePositive);
+        }
         if (filter.OpenOnly)
         {
             query = query.Where(i => i.Status != IncidentStatus.Resolved &&
@@ -77,6 +84,8 @@ public class IncidentService : IIncidentService
                 Status = i.Status,
                 Category = i.Category,
                 AssignedToName = i.AssignedTo != null ? i.AssignedTo.FullName : null,
+                Tier = i.Tier,
+                SlaDueAt = i.SlaDueAt,
                 CreatedAt = i.CreatedAt
             })
             .ToListAsync(cancellationToken);
@@ -120,6 +129,8 @@ public class IncidentService : IIncidentService
             DetectedAt = request.DetectedAt,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
+            Tier = 1,
+            SlaDueAt = CaseSla.DueAt(request.Severity, DateTime.UtcNow),
             Version = 0
         };
 
@@ -238,6 +249,39 @@ public class IncidentService : IIncidentService
             "Incident closed", request.ResolutionSummary, cancellationToken);
 
         await SaveWithConcurrencyCheckAsync(cancellationToken);
+
+        return IncidentMapper.ToDetailResponse(incident);
+    }
+
+    public async Task<IncidentDetailResponse> EscalateAsync(int id, EscalateIncidentRequest request, CancellationToken cancellationToken = default)
+    {
+        var incident = await FindIncidentOrThrowAsync(id, cancellationToken);
+
+        if (request.Tier < 1 || request.Tier > 3)
+            throw new ValidationAppException("Tier must be 1, 2 or 3.");
+        if (request.Tier < incident.Tier)
+            throw new ValidationAppException("Escalation can only raise the tier; de-escalation is not supported.");
+        if (request.Tier == incident.Tier && request.AssignedToId is null)
+            throw new ValidationAppException("Choose a higher tier, an assignee, or both.");
+
+        if (request.AssignedToId is not null)
+        {
+            var assigneeExists = await _dbContext.Users.AnyAsync(u => u.Id == request.AssignedToId && u.IsActive, cancellationToken);
+            if (!assigneeExists) throw new NotFoundException("User", request.AssignedToId.Value);
+            incident.AssignedToId = request.AssignedToId;
+        }
+
+        var previousTier = incident.Tier;
+        incident.Tier = request.Tier;
+        if (request.Tier > previousTier) incident.EscalatedAt = DateTime.UtcNow;
+        incident.UpdatedAt = DateTime.UtcNow;
+        incident.Version++;
+
+        await AddTimelineEventAsync(incident.Id, TimelineEventType.Escalation,
+            request.Tier > previousTier ? $"Escalated to Tier {request.Tier}" : "Reassigned", request.Note, cancellationToken);
+
+        await SaveWithConcurrencyCheckAsync(cancellationToken);
+        await _dbContext.Entry(incident).Reference(i => i.AssignedTo).LoadAsync(cancellationToken);
 
         return IncidentMapper.ToDetailResponse(incident);
     }

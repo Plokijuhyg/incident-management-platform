@@ -60,7 +60,10 @@ public enum IncidentSource
     ThreatIntel,
     PenTest,
     WindowsEvent,
-    Vpn
+    Vpn,
+    Ueba,
+    /// <summary>Opened automatically by the correlation engine from grouped alerts.</summary>
+    Correlation
 }
 
 /// <summary>
@@ -108,6 +111,21 @@ public class Incident
 
     public string? ResolutionSummary { get; set; }
     public string? FalsePositiveReason { get; set; }
+
+    // SOC case workflow (database-design.md §4.3 extension):
+    // Tier 1 = initial triage, Tier 2 = investigation, Tier 3 = IR/threat hunting.
+    // Escalation raises the tier; de-escalation is not modeled.
+    public int Tier { get; set; } = 1;
+    public DateTime? EscalatedAt { get; set; }
+
+    /// <summary>Response-time target, set from severity when the case opens. Used for the breach view.</summary>
+    public DateTime? SlaDueAt { get; set; }
+
+    /// <summary>
+    /// For correlation-created cases: the entity key that grouped the alerts
+    /// (e.g. "host:HOST01"). Lets later alerts for the same entity join the open case.
+    /// </summary>
+    public string? CorrelationKey { get; set; }
 
     /// <summary>
     /// Optimistic concurrency token. MySQL has no auto-updating binary row

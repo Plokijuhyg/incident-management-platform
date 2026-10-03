@@ -20,6 +20,8 @@ function normalizeDetail(value: IncidentDetail): IncidentDetail {
     containedAt: nullable(value.containedAt),
     resolvedAt: nullable(value.resolvedAt),
     closedAt: nullable(value.closedAt),
+    escalatedAt: nullable(value.escalatedAt),
+    slaDueAt: nullable(value.slaDueAt),
   };
 }
 @Injectable({ providedIn: 'root' })
@@ -29,14 +31,16 @@ export class Incidents {
   list(page = 1, pageSize = 25, filters: Record<string, string | number | boolean> = {}) {
     const params: Record<string, string | number | boolean> = { page, pageSize };
     for (const [key, value] of Object.entries(filters)) if (value !== '') params[key] = value;
-    return this.http
-      .get<Page<IncidentSummary>>('/api/incidents', { params })
-      .pipe(
-        map((result) => ({
-          ...result,
-          items: result.items.map((item) => ({ ...item, createdAt: utcTimestamp(item.createdAt) })),
+    return this.http.get<Page<IncidentSummary>>('/api/incidents', { params }).pipe(
+      map((result) => ({
+        ...result,
+        items: result.items.map((item) => ({
+          ...item,
+          createdAt: utcTimestamp(item.createdAt),
+          slaDueAt: item.slaDueAt ? utcTimestamp(item.slaDueAt) : null,
         })),
-      );
+      })),
+    );
   }
   update(id: number, request: UpdateIncident) {
     return this.http
@@ -56,6 +60,11 @@ export class Incidents {
   close(id: number, resolutionSummary: string) {
     return this.http
       .post<IncidentDetail>(`/api/incidents/${id}/close`, { resolutionSummary })
+      .pipe(map(normalizeDetail));
+  }
+  escalate(id: number, tier: number, assignedToId: number | null, note: string | null) {
+    return this.http
+      .post<IncidentDetail>(`/api/incidents/${id}/escalate`, { tier, assignedToId, note })
       .pipe(map(normalizeDetail));
   }
   detail(id: number) {

@@ -43,9 +43,17 @@ namespace IncidentPlatform.Api.Migrations
                     b.Property<string>("EnrichmentJson")
                         .HasColumnType("json");
 
+                    b.Property<string>("EntityIp")
+                        .HasMaxLength(45)
+                        .HasColumnType("varchar(45)");
+
                     b.Property<string>("ExternalId")
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
+
+                    b.Property<string>("Host")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
 
                     b.Property<int?>("IncidentId")
                         .HasColumnType("int");
@@ -86,12 +94,18 @@ namespace IncidentPlatform.Api.Migrations
                     b.Property<int?>("TriagedById")
                         .HasColumnType("int");
 
+                    b.Property<string>("Username")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("DeduplicationKey")
                         .IsUnique();
 
                     b.HasIndex("DetectedAt");
+
+                    b.HasIndex("Host");
 
                     b.HasIndex("IncidentId");
 
@@ -100,6 +114,8 @@ namespace IncidentPlatform.Api.Migrations
                     b.HasIndex("Status");
 
                     b.HasIndex("TriagedById");
+
+                    b.HasIndex("Status", "IncidentId", "ReceivedAt");
 
                     b.ToTable("Alerts", (string)null);
                 });
@@ -422,6 +438,69 @@ namespace IncidentPlatform.Api.Migrations
                     b.ToTable("DetectionRules");
                 });
 
+            modelBuilder.Entity("IncidentPlatform.Api.Models.EntityProfile", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("varchar(16)");
+
+                    b.Property<string>("EntityValue")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<long>("EventCount")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("FailedLoginsHour")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("FirstSeenAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("KnownSourceIpsJson")
+                        .IsRequired()
+                        .HasColumnType("json");
+
+                    b.Property<string>("LastAnomaly")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<DateTime?>("LastAnomalyAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<long>("LastEventId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("LastSeenAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("RiskScore")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("WindowStart")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RiskScore");
+
+                    b.HasIndex("EntityType", "EntityValue")
+                        .IsUnique();
+
+                    b.ToTable("EntityProfiles");
+                });
+
             modelBuilder.Entity("IncidentPlatform.Api.Models.Evidence", b =>
                 {
                     b.Property<int>("Id")
@@ -510,6 +589,10 @@ namespace IncidentPlatform.Api.Migrations
                     b.Property<DateTime?>("ContainedAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<string>("CorrelationKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
@@ -525,6 +608,9 @@ namespace IncidentPlatform.Api.Migrations
 
                     b.Property<string>("EnrichmentJson")
                         .HasColumnType("json");
+
+                    b.Property<DateTime?>("EscalatedAt")
+                        .HasColumnType("datetime(6)");
 
                     b.Property<string>("FalsePositiveReason")
                         .HasMaxLength(500)
@@ -554,6 +640,9 @@ namespace IncidentPlatform.Api.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)");
 
+                    b.Property<DateTime?>("SlaDueAt")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<string>("Source")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -563,6 +652,11 @@ namespace IncidentPlatform.Api.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)");
+
+                    b.Property<int>("Tier")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -583,6 +677,8 @@ namespace IncidentPlatform.Api.Migrations
 
                     b.HasIndex("Category");
 
+                    b.HasIndex("CorrelationKey");
+
                     b.HasIndex("CreatedAt");
 
                     b.HasIndex("CreatedById");
@@ -599,6 +695,10 @@ namespace IncidentPlatform.Api.Migrations
                     b.HasIndex("AssignedToId", "Status");
 
                     b.HasIndex("Status", "Severity");
+
+                    b.HasIndex("Status", "SlaDueAt");
+
+                    b.HasIndex("Tier", "Status");
 
                     b.ToTable("Incidents", (string)null);
                 });
