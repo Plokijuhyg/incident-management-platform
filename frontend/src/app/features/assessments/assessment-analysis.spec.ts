@@ -21,7 +21,7 @@ it('keeps a request alive after popup destruction and restores the completed rep
  panel.componentRef.setInput('assessment',{id:'a',status:'Completed',observationsJson:'[]',evidenceSha256:'abc'});
  http.expectOne('/api/assessments/analysis/status').flush({configured:true,model:'local',promptVersion:'v2'});
  panel.detectChanges();
- panel.nativeElement.querySelector('button').click();
+ (Array.from(panel.nativeElement.querySelectorAll('button')) as HTMLButtonElement[]).find(b=>b.textContent!.includes('Analyze'))!.click();
  const pending=http.expectOne('/api/assessments/a/analysis');
  panel.destroy();
  expect(pending.cancelled).toBe(false);

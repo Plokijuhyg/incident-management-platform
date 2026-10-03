@@ -15,11 +15,10 @@ public sealed class AssessmentService(AppDbContext db,AssessmentGateway gateway,
   if(await db.SecurityAssessments.CountAsync(x=>x.Status=="Pending"||x.Status=="Running",ct)>=10)throw new ValidationAppException("Assessment queue is full.");
   var row=new SecurityAssessment{RequestedById=user.Id,TargetId=target.Id,TargetName=target.Name,TargetIp=target.Ip,Profile=profile};db.Add(row);await db.SaveChangesAsync(ct);return row;
  }
- public async Task<SecurityAssessment> CreateSelection(string targetId,string selection,CancellationToken ct)
+ public async Task<SecurityAssessment> CreateSelection(ApprovedAssessmentTarget target,string selection,CancellationToken ct)
  {
   if(!gateway.Enabled)throw new ValidationAppException("HexStrike disabled.");
-  var target=gateway.FindTarget(targetId);
-  if(target is null)throw new ValidationAppException("Target approval changed.");
+  if(!target.Approved||!AssessmentGateway.PrivateIp(target.Ip))throw new ValidationAppException("Target must be an approved private lab IP.");
   if(await db.SecurityAssessments.CountAsync(x=>x.Status=="Pending"||x.Status=="Running",ct)>=10)throw new ValidationAppException("Assessment queue is full.");
   var row=new SecurityAssessment{RequestedById=user.Id,TargetId=target.Id,TargetName=target.Name,TargetIp=target.Ip,Profile="selected-tools",RequestJson=selection};
   db.Add(row);db.AuditLogs.Add(audit.Create("ASSESSMENT_REQUESTED","SecurityAssessment",row.Id,details:selection));await db.SaveChangesAsync(ct);return row;

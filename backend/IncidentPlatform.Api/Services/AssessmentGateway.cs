@@ -8,6 +8,15 @@ public sealed class AssessmentGateway(IConfiguration config,IHttpClientFactory c
  public bool Enabled=>config.GetValue<bool>("HexStrike:Enabled");
  public ApprovedAssessmentTarget[] Targets=>new ApprovedLabTargets(config).All;
  public ApprovedAssessmentTarget? FindTarget(string id)=>new ApprovedLabTargets(config).Find(id);
+ // Resolve a scan target from an approved configured id, or from an operator-typed private lab IP.
+ // A typed IP is accepted only when it is a private/RFC1918 address, so the internet can never be a target.
+ public ApprovedAssessmentTarget? ResolveTarget(string? id,string? ip)
+ {
+  if(!string.IsNullOrWhiteSpace(id)){var found=FindTarget(id);if(found is not null)return found;}
+  var value=ip?.Trim();
+  if(!string.IsNullOrEmpty(value)&&PrivateIp(value))return new ApprovedAssessmentTarget("manual:"+value,"Lab target "+value,value,true);
+  return null;
+ }
  public static bool PrivateIp(string value)=>IPAddress.TryParse(value,out var ip)&&ip.GetAddressBytes() is {Length:4} b&&(b[0]==10||b[0]==172&&b[1]>=16&&b[1]<=31||b[0]==192&&b[1]==168);
  public async Task<JsonElement> Send(HttpMethod method,string path,object? body,CancellationToken ct)
  {

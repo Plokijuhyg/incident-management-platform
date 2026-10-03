@@ -43,6 +43,11 @@ public class AssessmentSelectionTests : IClassFixture<TestApiFactory>
    var stored=await db.SecurityAssessments.AsNoTracking().SingleAsync(r=>r.Id==row.Id);
    Assert.Equal("selected-tools",stored.Profile);Assert.Equal("Pending",stored.Status);
    using var saved=JsonDocument.Parse(stored.RequestJson!);Assert.Equal("nuclei_scan",saved.RootElement.GetProperty("selectedTools")[0].GetString());
+   // A typed private lab IP that is not pre-registered is accepted; a public IP is refused.
+   var typed=await client.PostAsJsonAsync("/api/assessments/scan",new{targetId="",targetIp="192.168.207.130",categories=new[]{"Web"},selectedTools=new[]{"nuclei_scan"},manifestId="fixture",confirmed=false,webPort=8080,webHttps=false});
+   Assert.Equal(HttpStatusCode.Accepted,typed.StatusCode);
+   var typedRow=await typed.Content.ReadFromJsonAsync<SecurityAssessment>();Assert.Equal("192.168.207.130",typedRow!.TargetIp);Assert.Equal("manual:192.168.207.130",typedRow.TargetId);
+   Assert.Equal(HttpStatusCode.Forbidden,(await client.PostAsJsonAsync("/api/assessments/scan",new{targetId="",targetIp="8.8.8.8",categories=new[]{"Web"},selectedTools=new[]{"nuclei_scan"},manifestId="fixture",confirmed=false,webPort=8080,webHttps=false})).StatusCode);
    var calls=handler.Calls;
    var denied=await client.PostAsJsonAsync("/api/assessments/scan",Body("unapproved-selection-fixture"));
    Assert.Equal(HttpStatusCode.Forbidden,denied.StatusCode);Assert.Equal(calls,handler.Calls);
@@ -55,7 +60,7 @@ public class AssessmentSelectionTests : IClassFixture<TestApiFactory>
    await db.SecurityAssessments.Where(a=>a.RequestedById==actor.Id).ExecuteDeleteAsync();
    await db.RefreshTokens.Where(t=>t.UserId==actor.Id).ExecuteDeleteAsync();
    await db.UserRoles.Where(r=>r.UserId==actor.Id).ExecuteDeleteAsync();
-   await db.AuditLogs.Where(a=>a.ActorUserId==actor.Id||a.ActorEmail==email||a.EntityId=="unapproved-selection-fixture"||a.EntityId=="selection-fixture").ExecuteDeleteAsync();
+   await db.AuditLogs.Where(a=>a.ActorUserId==actor.Id||a.ActorEmail==email||a.EntityId=="unapproved-selection-fixture"||a.EntityId=="selection-fixture"||a.EntityId=="8.8.8.8").ExecuteDeleteAsync();
    await db.Users.Where(u=>u.Id==actor.Id).ExecuteDeleteAsync();
   }
  }

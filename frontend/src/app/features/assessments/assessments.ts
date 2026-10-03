@@ -59,13 +59,17 @@ interface Assessment {
     <form class="assessment-builder" (ngSubmit)="start()">
       <div class="builder-main">
         <section class="panel setup-section">
-          <div class="section-title"><span class="step-number">1</span><div><h2>Choose a target</h2><p>Pick the approved device you want to assess.</p></div></div>
-          <label for="assessment-target">Approved target</label>
-          <select id="assessment-target" name="target" [(ngModel)]="target" (ngModelChange)="confirmed = false">
-            <option value="">Select a target</option>
-            @for (t of targets(); track t.id) { <option [value]="t.id">{{ t.name }} &middot; {{ t.ip }}</option> }
-          </select>
-          @if (!targets().length) { <p class="notice">No approved targets configured. Ask an administrator to add your lab device.</p> }
+          <div class="section-title"><span class="step-number">1</span><div><h2>Choose a target</h2><p>Enter the IP of your approved private lab device (for example your Metasploitable VM), or pick a saved one.</p></div></div>
+          <label for="assessment-ip">Lab target IP</label>
+          <input id="assessment-ip" name="targetIp" [(ngModel)]="targetIp" (ngModelChange)="onIpChange()" placeholder="e.g. 192.168.207.129" inputmode="decimal" autocomplete="off" />
+          @if (targetIp && !privateIp(targetIp)) { <p class="field-error">Enter a private lab IP (10.x, 172.16&ndash;31.x or 192.168.x). Public addresses are not allowed.</p> }
+          @if (targets().length) {
+            <label for="assessment-target">Or choose a saved target</label>
+            <select id="assessment-target" name="target" [(ngModel)]="target" (ngModelChange)="onTargetSelect()">
+              <option value="">Select a saved target</option>
+              @for (t of targets(); track t.id) { <option [value]="t.id">{{ t.name }} &middot; {{ t.ip }}</option> }
+            </select>
+          }
         </section>
         <section class="panel setup-section">
           <div class="section-title"><span class="step-number">2</span><div><h2>Choose your checks</h2><p>Select a category, then choose the tools to run.</p></div></div>
@@ -269,6 +273,7 @@ export class AssessmentsPage {
   protected discovering = signal(false);
   private refreshing = false;
   protected target = '';
+  protected targetIp = '';
   protected profile = '';
   protected categories = ['Network', 'Web', 'Cloud', 'API'];
   protected selectedCategories: string[] = [];
@@ -282,12 +287,17 @@ export class AssessmentsPage {
   protected unavailableTools(category: string) { return this.categoryTools(category).filter(t => !t.available); }
   protected toolLabel(name: string) { return name.replaceAll('_', ' ').replace(/\b(scan|analyze|probe)$/, '').trim(); }
   protected categoryDescription(category: string) { return ({ Network: 'Ports, services & SMB', Web: 'Websites & application checks', Cloud: 'Cloud accounts & clusters', API: 'Endpoints & API schemas' } as Record<string,string>)[category]; }
-  protected targetLabel() { const value = this.targets().find(t => t.id === this.target); return value ? value.name + ' ? ' + value.ip : 'No target selected'; }
-  protected endpointPreview() { const ip = this.targets().find(t => t.id === this.target)?.ip; return ip ? (this.webHttps ? 'https://' : 'http://') + ip + ':' + this.webPort + this.webPath : 'Select a target to preview the endpoint.'; }
-  protected canStart() { return !!this.target && !!this.capability()?.connected && this.selectedTools.length > 0 && this.selectedCategories.every(c => this.readyTools(c).some(t => this.selectedTools.includes(t.name))) && (!this.needsConfirmation() || this.confirmed); }
+  protected privateIp(value: string) { const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec((value || '').trim()); if (!m) return false; const b = m.slice(1).map(Number); if (b.some(n => n > 255)) return false; return b[0] === 10 || (b[0] === 172 && b[1] >= 16 && b[1] <= 31) || (b[0] === 192 && b[1] === 168); }
+  protected resolvedIp() { const value = this.targets().find(t => t.id === this.target); if (value) return value.ip; return this.privateIp(this.targetIp) ? this.targetIp.trim() : ''; }
+  protected hasTarget() { return !!this.target || this.privateIp(this.targetIp); }
+  protected onIpChange() { if (this.targetIp) this.target = ''; this.confirmed = false; }
+  protected onTargetSelect() { if (this.target) this.targetIp = ''; this.confirmed = false; }
+  protected targetLabel() { const value = this.targets().find(t => t.id === this.target); if (value) return value.name + ' · ' + value.ip; return this.privateIp(this.targetIp) ? 'Lab target · ' + this.targetIp.trim() : 'No target selected'; }
+  protected endpointPreview() { const ip = this.resolvedIp(); return ip ? (this.webHttps ? 'https://' : 'http://') + ip + ':' + this.webPort + this.webPath : 'Enter a lab IP to preview the endpoint.'; }
+  protected canStart() { return this.hasTarget() && !!this.capability()?.connected && this.selectedTools.length > 0 && this.selectedCategories.every(c => this.readyTools(c).some(t => this.selectedTools.includes(t.name))) && (!this.needsConfirmation() || this.confirmed); }
   protected startHint() {
     if (!this.capability()?.connected) return 'Connect the gateway before starting.';
-    if (!this.target) return 'Choose a target first.';
+    if (!this.hasTarget()) return 'Enter a private lab IP or choose a saved target first.';
     if (!this.selectedTools.length) return 'Select at least one available tool.';
     if (this.selectedCategories.some(c => !this.readyTools(c).some(t => this.selectedTools.includes(t.name)))) return 'Choose tools for each category, or uncheck empty categories.';
     if (this.needsConfirmation() && !this.confirmed) return 'Review and confirm the selected checks.';
@@ -386,7 +396,7 @@ export class AssessmentsPage {
     if (this.busy() || !this.canStart()) return;
     this.busy.set(true);
     this.http
-      .post<Assessment>('/api/assessments/scan', { targetId: this.target, categories: this.selectedCategories, selectedTools: this.selectedTools, manifestId: this.capability()?.manifestId, confirmed: this.confirmed, webPort: this.webPort, webHttps: this.webHttps, webPath: this.webPath })
+      .post<Assessment>('/api/assessments/scan', { targetId: this.target, targetIp: this.targetIp.trim(), categories: this.selectedCategories, selectedTools: this.selectedTools, manifestId: this.capability()?.manifestId, confirmed: this.confirmed, webPort: this.webPort, webHttps: this.webHttps, webPath: this.webPath })
       .pipe(
         takeUntilDestroyed(this.destroy),
         finalize(() => this.busy.set(false)),

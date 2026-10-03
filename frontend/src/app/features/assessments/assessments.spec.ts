@@ -30,7 +30,7 @@ it('shows live tools, blocks unavailable tools and submits only the selected sco
  http.expectNone('/api/assessments/scan');
  page.confirmed=true;page.start();
  const request=http.expectOne('/api/assessments/scan');
- expect(request.request.body).toEqual({targetId:'lab',categories:['Web'],selectedTools:['nikto_scan'],manifestId:'manifest',confirmed:true,webPort:80,webHttps:false,webPath:'/'});
+ expect(request.request.body).toEqual({targetId:'lab',targetIp:'',categories:['Web'],selectedTools:['nikto_scan'],manifestId:'manifest',confirmed:true,webPort:80,webHttps:false,webPath:'/'});
  request.flush({id:'job',status:'Pending'});
  http.match('/api/assessments').forEach(r=>r.flush([]));
  http.match('/api/assessments/job').forEach(r=>r.flush({id:'job',status:'Pending'}));

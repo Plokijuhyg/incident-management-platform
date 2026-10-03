@@ -26,6 +26,8 @@ This maps executable product capabilities to UI entry points. Test code, migrati
 | Curated detection baseline (enable supported High/Critical rules, suppress noise) | Automation & coverage → Detection baseline: one-click apply in Observe mode; `GET`/`POST /api/detection-rules/baseline`. Excludes Sysmon-only rules (no Sysmon channel collected) |
 | Persisted assessment queue/history/evidence | Assessments; remote execution disabled until Laptop 2 is ready |
 | Offline HexStrike tool catalog (supported tools by category/tier) | Assessments → Supported tools; `GET /api/assessments/catalog`. Visible before the gateway connects; 21 reviewed/runnable, rest advertised-for-planning |
+| Assessment target by typed private lab IP or saved target | Assessments → Choose a target: a **Lab target IP** field (RFC1918 only; public IPs refused server-side) plus the saved-target picker. `POST /api/assessments/scan` with `targetIp` |
+| LLM analysis of assessment evidence (defensive brief and authorized-lab exploitation walkthrough) | Assessments → Inspect assessment → Local model analysis: a mode switch requests a defensive SOC brief or an educational lab exploitation walkthrough; `POST /api/assessments/{id}/analysis` with `mode`. Bounded normalized evidence only; local Ollama; deferred until a model is installed |
 | Readiness, rate limiting, security headers, validation | Enforced API infrastructure, not manual UI actions |
 
 ## Real telemetry versus fixtures

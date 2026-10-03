@@ -470,11 +470,11 @@ try {
             ]
           } : {connected:false,message:'Not configured. Laptop 2 is not available yet.',profiles:[],tools:[]};
         else if (path === '/api/assessments/targets') body = [{id:'lab',name:'Approved lab',ip:'192.168.207.129'}];
-        else if (path === '/api/assessments/analysis/status') body={configured:true,model:'llama3.1:8b',promptVersion:'defensive-brief-v2'};
+        else if (path === '/api/assessments/analysis/status') body={configured:true,model:'llama3.1:8b',promptVersion:'defensive-brief-v2',defensivePromptVersion:'defensive-brief-v2',offensivePromptVersion:'lab-exploitation-v1'};
         else if (path === '/api/assessments/'+assessmentId+'/analysis') {
           assert.equal(request.method,'POST');analysisCalls++;
           await new Promise(resolve=>{releaseAnalysis=resolve;});
-          body={status:'Completed',model:'llama3.1:8b',evidenceSha256:'abc',inputSha256:'def',promptVersion:'defensive-brief-v2',generatedAt:new Date().toISOString(),text:'1. Vulnerability Summary - Fixture observation <script>unsafe()</script>\n2. Attack Surface - HTTP\n3. Detection Guidance - Inspect access logs\n4. Mitigation Steps - Review configuration\n5. Severity Justification - No CVSS provided',error:null,includedObservations:1,totalObservations:1,inputTruncated:false,outputTruncated:false};
+          body={status:'Completed',model:'llama3.1:8b',evidenceSha256:'abc',inputSha256:'def',promptVersion:'defensive-brief-v2',mode:'defensive',generatedAt:new Date().toISOString(),text:'1. Vulnerability Summary - Fixture observation <script>unsafe()</script>\n2. Attack Surface - HTTP\n3. Detection Guidance - Inspect access logs\n4. Mitigation Steps - Review configuration\n5. Severity Justification - No CVSS provided',error:null,includedObservations:1,totalObservations:1,inputTruncated:false,outputTruncated:false};
           assessmentFixture.analysisJson=JSON.stringify(body);
         }
         else if (path === '/api/assessments/'+assessmentId) body=assessmentFixture;
@@ -905,10 +905,10 @@ try {
   assert(await evaluate(`document.querySelector('.assessment-builder').getBoundingClientRect().right<=window.innerWidth`), 'Mobile assessment overflows viewport');
   await screenshot('browser-assessments-mobile');
   await clickButton('Inspect assessment');
-  await until(()=>textHas('Ollama defensive brief'),'Analysis panel missing');
+  await until(()=>textHas('Local model analysis'),'Analysis panel missing');
   assert.equal(analysisCalls,0,'Opening evidence triggered inference automatically');
-  await until(()=>evaluate(`!Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Analyze results with Ollama').disabled`),'Analysis button unavailable');
-  await clickButton('Analyze results with Ollama');
+  await until(()=>evaluate(`!Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Analyze: defensive brief').disabled`),'Analysis button unavailable');
+  await clickButton('Analyze: defensive brief');
   await until(()=>Promise.resolve(!!releaseAnalysis),'Analysis request did not start');
   await clickButton('Minimize');
   assert(await evaluate(`!document.querySelector('dialog[open]') && document.body.style.overflow!=='hidden'`),'Minimize did not release the page');
