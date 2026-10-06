@@ -22,9 +22,13 @@ public class OllamaAnalysisTests(TestApiFactory factory):IClassFixture<TestApiFa
   public HttpClient CreateClient(string name)=>new(this,false){Timeout=Timeout.InfiniteTimeSpan};
   protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage r,CancellationToken ct){Assert.Equal("127.0.0.1",r.RequestUri!.Host);if(Fail)throw new HttpRequestException("private transport detail");
    if(r.RequestUri.AbsolutePath=="/api/tags")return new(HttpStatusCode.OK){Content=new StringContent("{\"models\":[{\"name\":\"llama3.1:8b\"}]}")};
-   Chats++;Assert.Equal("/api/chat",r.RequestUri.AbsolutePath);Assert.Equal(HttpMethod.Post,r.Method);Prompt=await r.Content!.ReadAsStringAsync(ct);using var doc=JsonDocument.Parse(Prompt);Assert.False(doc.RootElement.TryGetProperty("tools",out _));Assert.False(doc.RootElement.GetProperty("stream").GetBoolean());Assert.Equal(5,doc.RootElement.GetProperty("format").GetProperty("required").GetArrayLength());OnChat?.Invoke();
-   var brief=doc.RootElement.GetProperty("format").GetProperty("required").EnumerateArray().ToDictionary(k=>k.GetString()!,k=>(object)(k.GetString()+" detail [1]."));
-   var content=Prose?"The host runs SSH and HTTP; review these manually.":JsonSerializer.Serialize(brief);
+   Chats++;Assert.Equal("/api/chat",r.RequestUri.AbsolutePath);Assert.Equal(HttpMethod.Post,r.Method);Prompt=await r.Content!.ReadAsStringAsync(ct);using var doc=JsonDocument.Parse(Prompt);Assert.False(doc.RootElement.TryGetProperty("tools",out _));Assert.False(doc.RootElement.GetProperty("stream").GetBoolean());
+   var hasFormat=doc.RootElement.TryGetProperty("format",out var fmt);
+   if(hasFormat)Assert.Equal(5,fmt.GetProperty("required").GetArrayLength());
+   OnChat?.Invoke();
+   string content;
+   if(!hasFormat)content="## Finding Summary\nSMB on 445.\n## Exploitation Path (lab)\n1. use exploit/windows/smb/ms17_010_eternalblue\n```\nset RHOSTS 192.168.0.110\nrun\n```";
+   else{var brief=fmt.GetProperty("required").EnumerateArray().ToDictionary(k=>k.GetString()!,k=>(object)(k.GetString()+" detail [1]."));content=Prose?"The host runs SSH and HTTP; review these manually.":JsonSerializer.Serialize(brief);}
    return new(HttpStatusCode.OK){Content=new StringContent(JsonSerializer.Serialize(new{model=WrongModel?"other":"llama3.1:8b",done=true,message=new{content,tool_calls=ToolCall?new[]{new{name="execute"}}:[]}}))};
   }
  }
@@ -36,7 +40,7 @@ public class OllamaAnalysisTests(TestApiFactory factory):IClassFixture<TestApiFa
  [Fact]public async Task Network_failure_is_a_safe_result(){var row=Row();var result=await new OllamaAnalysis(Config(),new Transport{Fail=true}).Analyze(row,OllamaAnalysis.Prepare(row),default);Assert.Equal("Unavailable",result.Status);Assert.DoesNotContain("private transport",result.Error);}
  [Theory][InlineData(true,false)][InlineData(false,true)]public async Task Tool_requests_and_wrong_models_are_rejected(bool tool,bool model){var row=Row();var result=await new OllamaAnalysis(Config(),new Transport{ToolCall=tool,WrongModel=model}).Analyze(row,OllamaAnalysis.Prepare(row),default);Assert.NotEqual("Completed",result.Status);Assert.Null(result.Text);}
  [Fact]public async Task Unstructured_model_output_is_shown_not_discarded(){var row=Row();var result=await new OllamaAnalysis(Config(),new Transport{Prose=true}).Analyze(row,OllamaAnalysis.Prepare(row),default);Assert.Equal("Completed",result.Status);Assert.NotNull(result.Text);Assert.Contains("SSH",result.Text!);Assert.Contains("Unstructured",result.Text!);}
- [Fact]public async Task Offensive_mode_requests_the_lab_exploitation_schema_and_is_tagged(){var row=Row();var transport=new Transport();var result=await new OllamaAnalysis(Config(),transport).Analyze(row,OllamaAnalysis.Prepare(row),default,"offensive");Assert.Equal("Completed",result.Status);Assert.Equal("offensive",result.Mode);Assert.Equal(OllamaAnalysis.OffensivePromptVersion,result.PromptVersion);Assert.Contains("isolated security lab",transport.Prompt);Assert.Contains("exploitation",transport.Prompt);Assert.Contains("Exploitation Path (lab)",result.Text);}
+ [Fact]public async Task Offensive_mode_requests_free_form_markdown_and_is_tagged(){var row=Row();var transport=new Transport();var result=await new OllamaAnalysis(Config(),transport).Analyze(row,OllamaAnalysis.Prepare(row),default,"offensive");Assert.Equal("Completed",result.Status);Assert.Equal("offensive",result.Mode);Assert.Equal(OllamaAnalysis.OffensivePromptVersion,result.PromptVersion);Assert.Contains("isolated security lab",transport.Prompt);Assert.DoesNotContain("\"format\"",transport.Prompt);Assert.Contains("Exploitation Path (lab)",result.Text!);Assert.Contains("ms17_010_eternalblue",result.Text!);}
  [Fact]public async Task Analysis_persists_without_mutating_evidence_and_reuses_saved_report()
  {
   using var scope=factory.Services.CreateScope();var db=scope.ServiceProvider.GetRequiredService<AppDbContext>();var row=Row();row.RequestedById=await db.Users.Select(u=>u.Id).FirstAsync();db.Add(row);await db.SaveChangesAsync();db.Entry(row).State=EntityState.Detached;
