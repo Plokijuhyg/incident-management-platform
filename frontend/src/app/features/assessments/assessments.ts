@@ -63,7 +63,7 @@ interface Assessment {
         <section class="panel setup-section">
           <div class="section-title"><span class="step-number">1</span><div><h2>Choose a target</h2><p>Enter the IP of your approved private lab device (for example your Metasploitable VM), or pick a saved one.</p></div></div>
           <label for="assessment-ip">Lab target IP</label>
-          <input id="assessment-ip" name="targetIp" [(ngModel)]="targetIp" (ngModelChange)="onIpChange()" placeholder="e.g. 192.168.207.129" inputmode="decimal" autocomplete="off" />
+          <input id="assessment-ip" name="targetIp" [(ngModel)]="targetIp" (ngModelChange)="onIpChange()" placeholder="e.g. 192.168.0.105" inputmode="decimal" autocomplete="off" />
           @if (targetIp && !privateIp(targetIp)) { <p class="field-error">Enter a private lab IP (10.x, 172.16&ndash;31.x or 192.168.x). Public addresses are not allowed.</p> }
           @if (targets().length) {
             <label for="assessment-target">Or choose a saved target</label>
@@ -321,7 +321,9 @@ export class AssessmentsPage {
     const route=inject(ActivatedRoute,{optional:true});
     route?.queryParamMap.pipe(takeUntilDestroyed()).subscribe(params=>{const id=params.get('assessment');if(id)this.open(id);});
     this.discover();
-    timer(30000, 30000).pipe(takeUntilDestroyed()).subscribe(() => { if (!document.hidden && !this.capability()?.connected && !this.busy()) this.discover(); });
+    // Re-check the gateway soon and often while it is not connected, so the runnable tool list appears
+    // once the tunnel/gateway is up without the analyst having to click "Check gateway" manually.
+    timer(4000, 8000).pipe(takeUntilDestroyed()).subscribe(() => { if (!document.hidden && !this.capability()?.connected && !this.busy()) this.discover(); });
     timer(0, 5000)
       .pipe(takeUntilDestroyed())
       .subscribe(() => {

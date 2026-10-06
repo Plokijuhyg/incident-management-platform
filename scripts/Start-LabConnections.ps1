@@ -1,4 +1,4 @@
-param([string]$KaliHost='192.168.207.130',[string]$KaliUser='kali')
+param([string]$KaliHost='192.168.0.104',[string]$KaliUser='kali')
 $ErrorActionPreference='Stop'
 $address=$null
 if(-not [Net.IPAddress]::TryParse($KaliHost,[ref]$address)){throw 'Supply the verified Kali IP address.'}

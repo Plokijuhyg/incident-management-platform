@@ -64,12 +64,19 @@ public sealed class OllamaAnalysis(IConfiguration config,IHttpClientFactory clie
    if(!root.TryGetProperty("done",out var done)||done.ValueKind!=JsonValueKind.True||!root.TryGetProperty("model",out var used)||used.GetString()!=model||!root.TryGetProperty("message",out var message)||!message.TryGetProperty("content",out var content)||content.ValueKind!=JsonValueKind.String)throw new JsonException();
    if(message.TryGetProperty("tool_calls",out var calls)&&calls.ValueKind==JsonValueKind.Array&&calls.GetArrayLength()>0)return Result("Failed",error:"The model returned a tool request instead of a report. Nothing was executed.");
    var text=content.GetString()!;if(string.IsNullOrWhiteSpace(text)||text.Length>20000)return Result("Failed",error:"The model returned empty or oversized analysis.");
-   if(root.TryGetProperty("done_reason",out var reason)&&reason.GetString()=="length")return Result("Failed",error:"The model reached its response limit. No complete defensive brief was saved.",cut:true);
-   using var brief=JsonDocument.Parse(text,new JsonDocumentOptions{MaxDepth=8});
-   if(brief.RootElement.ValueKind!=JsonValueKind.Object||keys.Any(k=>!brief.RootElement.TryGetProperty(k,out var value)||value.ValueKind!=JsonValueKind.String||string.IsNullOrWhiteSpace(value.GetString())))return Result("Failed",error:"The model did not return all five defensive brief sections. Retry analysis.");
+   var cut=root.TryGetProperty("done_reason",out var reason)&&reason.GetString()=="length";
    string[] headings=offensive?["Finding Summary","Exploitation Path (lab)","Impact","Detection Guidance","Remediation"]:["Vulnerability Summary","Attack Surface","Detection Guidance","Mitigation Steps","Severity Justification"];
-   text=string.Join("\n\n",keys.Select((k,i)=>$"{i+1}. {headings[i]} \u2014\n{brief.RootElement.GetProperty(k).GetString()}"));
-   return Result("Completed",text);
+   // Prefer the structured brief. If the local model did not honour the JSON schema (older Ollama, or a
+   // model without structured-output support), still surface its raw text \u2014 a visible, flagged brief
+   // beats discarding the model's work and showing the analyst nothing.
+   try
+   {
+    using var brief=JsonDocument.Parse(text,new JsonDocumentOptions{MaxDepth=8});
+    if(brief.RootElement.ValueKind==JsonValueKind.Object&&keys.All(k=>brief.RootElement.TryGetProperty(k,out var value)&&value.ValueKind==JsonValueKind.String&&!string.IsNullOrWhiteSpace(value.GetString())))
+     return Result("Completed",string.Join("\n\n",keys.Select((k,i)=>$"{i+1}. {headings[i]} \u2014\n{brief.RootElement.GetProperty(k).GetString()}")),cut:cut);
+   }
+   catch(JsonException){}
+   return Result("Completed","Unstructured model output \u2014 the model did not return the requested sections, so its raw response is shown for manual review:\n\n"+text,cut:cut);
   }
   catch(OperationCanceledException) when(!ct.IsCancellationRequested){return Result("TimedOut",error:"Ollama did not finish within three minutes. Scanner results are unchanged; retry when the model is ready.");}
   catch(Exception ex) when(ex is HttpRequestException or JsonException or InvalidOperationException or NotSupportedException){return Result("Unavailable",error:"Ollama is unavailable or returned an invalid response. Check the connection and model, then retry.");}
