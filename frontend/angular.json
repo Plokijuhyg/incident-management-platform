@@ -63,7 +63,9 @@
           },
           "defaultConfiguration": "development",
           "options": {
-            "proxyConfig": "proxy.conf.json"
+            "proxyConfig": "proxy.conf.json",
+            "host": "0.0.0.0",
+            "allowedHosts": ["localhost", "127.0.0.1", "192.168.50.1"]
           }
         },
         "test": {
