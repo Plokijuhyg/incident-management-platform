@@ -332,3 +332,19 @@ Security claims need proof, not prose. Each control gets checked as it lands:
 - `/security-review` run against each phase's diff before commit.
 
 A control's ✅ marker in this file is only earned once its check exists and passes.
+
+## 12. Deferred (TODO) — not yet implemented
+
+These are explicitly deferred to a later phase, recorded here so they are not forgotten:
+
+- **Target-side firewall / WAF hardening on the Metasploitable3 VMs.** During the
+  two-laptop demo the attack path is intentionally left open — no host firewall, WAF
+  or network-level blocking is applied on the vulnerable VMs. Harden (or isolate
+  further) after the demo.
+- **Vulnerable-VM network exposure.** The lab uses a dedicated point-to-point link
+  between the two laptops (`192.168.50.0/24`); the intentionally-vulnerable VM must
+  never be bridged onto a shared campus/home network. Keep it off any network that
+  carries other devices.
+- **Direct LAN API/MySQL exposure.** The two-laptop setup serves the Angular dev
+  server on `0.0.0.0:4200`; the API stays `localhost` (reached via the dev-server
+  proxy) and MySQL stays `localhost`. Do not publish the API or MySQL on the LAN.
