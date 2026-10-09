@@ -19,7 +19,7 @@ public class DataSeederTests
     }
 
     [Fact]
-    public async Task SeedAsync_OnEmptyDatabase_CreatesAllThreeRoles()
+    public async Task SeedAsync_OnEmptyDatabase_CreatesAllSeededRoles()
     {
         await using var context = CreateInMemoryContext();
         var hasher = new PasswordHasher();
@@ -28,10 +28,11 @@ public class DataSeederTests
 
         var roleNames = await context.Roles.Select(r => r.Name).ToListAsync();
 
-        Assert.Equal(3, roleNames.Count);
+        Assert.Equal(4, roleNames.Count);
         Assert.Contains(RoleNames.Admin, roleNames);
         Assert.Contains(RoleNames.SecurityManager, roleNames);
         Assert.Contains(RoleNames.SocAnalyst, roleNames);
+        Assert.Contains(RoleNames.RedTeam, roleNames);
     }
 
     [Fact]
@@ -45,7 +46,7 @@ public class DataSeederTests
 
         var totalRoleCount = await context.Roles.CountAsync();
 
-        Assert.Equal(3, totalRoleCount);
+        Assert.Equal(4, totalRoleCount);
     }
 
     [Fact]

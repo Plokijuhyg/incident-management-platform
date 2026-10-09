@@ -1,5 +1,12 @@
 import { Routes } from '@angular/router';
-import { adminGuard, authGuard, guestGuard, managerGuard } from './core/guards/auth';
+import {
+  adminGuard,
+  assessmentGuard,
+  authGuard,
+  guestGuard,
+  managerGuard,
+  redTeamScopeGuard,
+} from './core/guards/auth';
 import { alertsMatcher } from './features/alerts/alerts-matcher';
 export const routes: Routes = [
   {
@@ -11,7 +18,7 @@ export const routes: Routes = [
   {
     path: '',
     canActivate: [authGuard],
-    canActivateChild: [authGuard],
+    canActivateChild: [authGuard, redTeamScopeGuard],
     loadComponent: () => import('./layout/shell').then((m) => m.Shell),
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
@@ -24,7 +31,7 @@ export const routes: Routes = [
       {
         path: 'assessments',
         title: 'Security Assessments | Incident Platform',
-        canActivate: [managerGuard],
+        canActivate: [assessmentGuard],
         loadComponent: () =>
           import('./features/assessments/assessments').then((m) => m.AssessmentsPage),
       },

@@ -10,7 +10,7 @@ namespace IncidentPlatform.Api.Controllers;
 
 [ApiController]
 [Route("api/alerts")]
-[Authorize]
+[Authorize(Roles = $"{RoleNames.Admin},{RoleNames.SecurityManager},{RoleNames.SocAnalyst}")]
 public class AlertsController : ControllerBase
 {
     private readonly IAlertService _alertService;

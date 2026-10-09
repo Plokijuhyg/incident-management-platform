@@ -1,11 +1,12 @@
 using IncidentPlatform.Api.Interfaces;
+using IncidentPlatform.Api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace IncidentPlatform.Api.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = $"{RoleNames.Admin},{RoleNames.SecurityManager},{RoleNames.SocAnalyst}")]
 [Route("api/dashboard")]
 public sealed class DashboardController(IDashboardService dashboard) : ControllerBase
 {

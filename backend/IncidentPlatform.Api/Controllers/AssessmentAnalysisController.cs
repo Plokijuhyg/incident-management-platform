@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 namespace IncidentPlatform.Api.Controllers;
 public record AnalyzeRequest(string? Mode);
-[ApiController,Authorize(Roles=$"{RoleNames.Admin},{RoleNames.SecurityManager}"),Route("api/assessments")]
+[ApiController,Authorize(Roles=$"{RoleNames.Admin},{RoleNames.SecurityManager},{RoleNames.RedTeam}"),Route("api/assessments")]
 public sealed class AssessmentAnalysisController(AppDbContext db,IConfiguration config,OllamaAnalysis ollama,IAuditContext audit):ControllerBase
 {
  [HttpGet("analysis/status")]public IActionResult Status()=>Ok(new{configured=ollama.Configured,model=ollama.Model,promptVersion=OllamaAnalysis.DefensivePromptVersion,defensivePromptVersion=OllamaAnalysis.DefensivePromptVersion,offensivePromptVersion=OllamaAnalysis.OffensivePromptVersion});

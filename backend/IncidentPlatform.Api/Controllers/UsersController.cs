@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace IncidentPlatform.Api.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = $"{RoleNames.Admin},{RoleNames.SecurityManager},{RoleNames.SocAnalyst}")]
 public class UsersController : ControllerBase
 {
     private readonly IUserService _userService;

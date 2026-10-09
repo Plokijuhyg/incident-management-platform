@@ -26,4 +26,12 @@ public static class RoleNames
     public const string Admin = "ADMIN";
     public const string SecurityManager = "SECURITY_MANAGER";
     public const string SocAnalyst = "SOC_ANALYST";
+
+    /// <summary>
+    /// Red-team identity for the two-laptop lab: authorized ONLY on the Assessments
+    /// module (target/tool selection, triggering scans, viewing its own results and
+    /// their LLM analysis). Explicitly excluded from every blue-team/SOC endpoint —
+    /// those controllers enumerate the blue roles, so RED_TEAM is denied (403).
+    /// </summary>
+    public const string RedTeam = "RED_TEAM";
 }

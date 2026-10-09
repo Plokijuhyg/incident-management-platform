@@ -1,5 +1,6 @@
 using IncidentPlatform.Api.DTOs.Mitre;
 using IncidentPlatform.Api.Interfaces;
+using IncidentPlatform.Api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -7,7 +8,7 @@ namespace IncidentPlatform.Api.Controllers;
 
 [ApiController]
 [Route("api/mitre")]
-[Authorize]
+[Authorize(Roles = $"{RoleNames.Admin},{RoleNames.SecurityManager},{RoleNames.SocAnalyst}")]
 public class MitreController : ControllerBase
 {
     private readonly IMitreService _mitreService;

@@ -11,7 +11,7 @@ public record CreateAssessmentRequest(string TargetId,string Profile);
 public record ScanAssessmentRequest(string TargetId,string[] Categories,string[]? SelectedTools,string ManifestId,bool Confirmed=false,int WebPort=80,bool WebHttps=false,string WebPath="/",string? TargetIp=null);
 // Generic single-tool execution: name the HexStrike tool; the gateway builds and runs it.
 public record ExecuteToolRequest(string ToolName,string? TargetId=null,string? TargetIp=null,bool Confirmed=false,int WebPort=80,bool WebHttps=false,string WebPath="/");
-[ApiController,Authorize(Roles=$"{RoleNames.Admin},{RoleNames.SecurityManager}"),Route("api/assessments")]
+[ApiController,Authorize(Roles=$"{RoleNames.Admin},{RoleNames.SecurityManager},{RoleNames.RedTeam}"),Route("api/assessments")]
 public sealed class AssessmentsController(AssessmentService service,AssessmentGateway gateway,AppDbContext db):ControllerBase
 {
  // Offline tool catalog: what the platform supports, visible before the Kali gateway is connected.

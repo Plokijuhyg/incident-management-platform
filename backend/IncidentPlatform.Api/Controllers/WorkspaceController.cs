@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 namespace IncidentPlatform.Api.Controllers;
 
-[ApiController, Authorize]
+[ApiController, Authorize(Roles = $"{RoleNames.Admin},{RoleNames.SecurityManager},{RoleNames.SocAnalyst}")]
 public sealed class WorkspaceController(IWorkspaceService service) : ControllerBase
 {
     [HttpGet("api/audit-logs"), Authorize(Roles = RoleNames.Admin)]

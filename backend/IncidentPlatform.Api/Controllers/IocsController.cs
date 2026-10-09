@@ -9,7 +9,7 @@ namespace IncidentPlatform.Api.Controllers;
 
 [ApiController]
 [Route("api/iocs")]
-[Authorize]
+[Authorize(Roles = $"{RoleNames.Admin},{RoleNames.SecurityManager},{RoleNames.SocAnalyst}")]
 public class IocsController : ControllerBase
 {
     private readonly IIocService _iocService;

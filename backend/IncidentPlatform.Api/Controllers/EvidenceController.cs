@@ -11,7 +11,7 @@ namespace IncidentPlatform.Api.Controllers;
 // inherited from the parent.
 [ApiController]
 [Route("api/incidents/{incidentId:int}/evidence")]
-[Authorize]
+[Authorize(Roles = $"{RoleNames.Admin},{RoleNames.SecurityManager},{RoleNames.SocAnalyst}")]
 public class EvidenceController : ControllerBase
 {
     private readonly IEvidenceService _evidenceService;

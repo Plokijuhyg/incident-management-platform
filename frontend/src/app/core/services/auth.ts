@@ -18,6 +18,19 @@ export class Auth {
   canManageIncidents(): boolean {
     return this.hasRole('ADMIN') || this.hasRole('SECURITY_MANAGER');
   }
+  // Can reach the Assessments module (managers/admin, plus the red-team lab identity).
+  canRunAssessments(): boolean {
+    return this.canManageIncidents() || this.hasRole('RED_TEAM');
+  }
+  // A red-team-only user has RED_TEAM and no blue-team role — scoped to Assessments only.
+  isRedTeamOnly(): boolean {
+    return (
+      this.hasRole('RED_TEAM') &&
+      !this.hasRole('ADMIN') &&
+      !this.hasRole('SECURITY_MANAGER') &&
+      !this.hasRole('SOC_ANALYST')
+    );
+  }
   accessToken(): string | null {
     return this.token;
   }

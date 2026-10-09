@@ -11,7 +11,8 @@ public static class DataSeeder
     [
         (RoleNames.Admin, "Full system access: manages users, roles, and all incidents."),
         (RoleNames.SecurityManager, "Broad incident visibility, assignment, and closure approval."),
-        (RoleNames.SocAnalyst, "Investigation-focused: assigned incidents, evidence, IOCs, response actions.")
+        (RoleNames.SocAnalyst, "Investigation-focused: assigned incidents, evidence, IOCs, response actions."),
+        (RoleNames.RedTeam, "Red-team lab identity: Assessments module only (scans + their analysis); no SOC access.")
     ];
 
     public static async Task SeedAsync(
@@ -100,6 +101,67 @@ public static class DataSeeder
         await context.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation("Seeded integration service account {Email}", normalizedEmail);
+    }
+
+    /// <summary>
+    /// Seeds the demo red-team account for the two-laptop lab (RED_TEAM role only).
+    /// Optional and config-driven (RedTeam:Email / RedTeam:Password in User Secrets),
+    /// same pattern as the admin and integration-account seeding. Never grants a blue role.
+    /// </summary>
+    public static async Task SeedRedTeamUserAsync(
+        AppDbContext context,
+        IPasswordHasher passwordHasher,
+        string? email,
+        string? password,
+        ILogger logger,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+        {
+            return; // optional — silently skipped if not configured
+        }
+
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+
+        if (await context.Users.AnyAsync(u => u.Email == normalizedEmail, cancellationToken))
+        {
+            return;
+        }
+
+        var redTeamRole = await context.Roles.SingleOrDefaultAsync(r => r.Name == RoleNames.RedTeam, cancellationToken);
+        if (redTeamRole is null)
+        {
+            logger.LogWarning("Cannot seed red-team account: RED_TEAM role not found yet.");
+            return;
+        }
+
+        var adminForAttribution = await context.Users
+            .FirstOrDefaultAsync(u => u.UserRoles.Any(ur => ur.Role.Name == RoleNames.Admin), cancellationToken);
+
+        var now = DateTime.UtcNow;
+        var redTeamUser = new User
+        {
+            Email = normalizedEmail,
+            FullName = "Red Team (Lab)",
+            PasswordHash = passwordHasher.Hash(password),
+            IsActive = true,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        context.Users.Add(redTeamUser);
+        await context.SaveChangesAsync(cancellationToken); // generates Id
+
+        context.UserRoles.Add(new UserRole
+        {
+            UserId = redTeamUser.Id,
+            RoleId = redTeamRole.Id,
+            AssignedAt = now,
+            AssignedById = adminForAttribution?.Id ?? redTeamUser.Id
+        });
+
+        await context.SaveChangesAsync(cancellationToken);
+        logger.LogInformation("Seeded red-team lab account {Email}", normalizedEmail);
     }
 
     private static async Task SeedAdminUserAsync(

@@ -15,14 +15,17 @@ import { ErrorNotice } from '../shared/components/error-notice';
       <header class="siem-header">
         <a class="brand" routerLink="/dashboard"><span class="brand-mark">IP</span><span>Incident<span class="brand-accent">SIEM</span></span></a>
         <nav class="primary-tabs" aria-label="Main sections">
-          <a routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
-          <a routerLink="/alerts" routerLinkActive="active">Alerts</a>
-          <a routerLink="/incidents" routerLinkActive="active">Incidents</a>
-          @if(auth.canManageIncidents()){<a routerLink="/analytics" routerLinkActive="active">Analytics</a>}
-          <a routerLink="/assets" routerLinkActive="active">Assets</a>
-          <a routerLink="/resources" routerLinkActive="active">Resources</a>
-          <a routerLink="/tasks" routerLinkActive="active">Tasks</a>
-          @if(auth.hasRole('ADMIN')){<a routerLink="/users" routerLinkActive="active">Users</a>}
+          @if(!auth.isRedTeamOnly()){
+            <a routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
+            <a routerLink="/alerts" routerLinkActive="active">Alerts</a>
+            <a routerLink="/incidents" routerLinkActive="active">Incidents</a>
+            @if(auth.canManageIncidents()){<a routerLink="/analytics" routerLinkActive="active">Analytics</a>}
+            <a routerLink="/assets" routerLinkActive="active">Assets</a>
+            <a routerLink="/resources" routerLinkActive="active">Resources</a>
+            <a routerLink="/tasks" routerLinkActive="active">Tasks</a>
+            @if(auth.hasRole('ADMIN')){<a routerLink="/users" routerLinkActive="active">Users</a>}
+          }
+          @if(auth.canRunAssessments()){<a routerLink="/assessments" routerLinkActive="active">Assessments</a>}
         </nav>
       </header>
       <div class="workspace">
@@ -49,6 +52,7 @@ import { ErrorNotice } from '../shared/components/error-notice';
             />
             @for (link of links; track link.path) {
               @if (
+                !auth.isRedTeamOnly() &&
                 (!link.admin || auth.hasRole('ADMIN')) &&
                 (!link.manager || auth.canManageIncidents()) &&
                 link.label.toLowerCase().includes(search.toLowerCase())
@@ -65,7 +69,7 @@ import { ErrorNotice } from '../shared/components/error-notice';
         }
         <nav class="workspace-tabs" aria-label="Workspace views">
           @for(link of links;track link.path){
-            @if((!link.admin || auth.hasRole('ADMIN')) && (!link.manager || auth.canManageIncidents())){
+            @if(!auth.isRedTeamOnly() && (!link.admin || auth.hasRole('ADMIN')) && (!link.manager || auth.canManageIncidents())){
               <a [routerLink]="link.path" routerLinkActive="active"><app-icon [name]="link.icon" />{{link.label}}</a>
             }
           }

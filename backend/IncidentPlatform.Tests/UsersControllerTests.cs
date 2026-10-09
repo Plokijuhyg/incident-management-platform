@@ -251,7 +251,7 @@ public class UsersControllerTests : IClassFixture<TestApiFactory>
     }
 
     [Fact]
-    public async Task GetRoles_ReturnsTheThreeSeededRoles()
+    public async Task GetRoles_ReturnsTheSeededRoles()
     {
         var email = await CreateUserAsync(RoleNames.SocAnalyst);
         try
@@ -260,7 +260,7 @@ public class UsersControllerTests : IClassFixture<TestApiFactory>
             var response = await client.GetAsync("/api/roles");
             var roles = await response.Content.ReadFromJsonAsync<List<RoleResponse>>();
 
-            Assert.Equal(3, roles!.Count);
+            Assert.Equal(4, roles!.Count);
         }
         finally
         {

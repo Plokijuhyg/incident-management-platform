@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 namespace IncidentPlatform.Api.Controllers;
 
-[ApiController,Authorize,Route("api/soc")]
+[ApiController,Authorize(Roles=$"{RoleNames.Admin},{RoleNames.SecurityManager},{RoleNames.SocAnalyst}"),Route("api/soc")]
 public sealed class SocController(AppDbContext db) : ControllerBase
 {
     [HttpGet("overview")]

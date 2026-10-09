@@ -9,7 +9,7 @@ namespace IncidentPlatform.Api.Controllers;
 
 [ApiController]
 [Route("api/assets")]
-[Authorize]
+[Authorize(Roles = $"{RoleNames.Admin},{RoleNames.SecurityManager},{RoleNames.SocAnalyst}")]
 public class AssetsController : ControllerBase
 {
     private readonly IAssetService _assetService;

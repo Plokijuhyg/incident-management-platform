@@ -280,6 +280,10 @@ try
         var connectorEmail = app.Configuration["Integration:HexStrikeEmail"];
         var connectorPassword = app.Configuration["Integration:HexStrikePassword"];
         await DataSeeder.SeedIntegrationAccountAsync(dbContext, passwordHasher, connectorEmail, connectorPassword, seedLogger);
+
+        var redTeamEmail = app.Configuration["RedTeam:Email"];
+        var redTeamPassword = app.Configuration["RedTeam:Password"];
+        await DataSeeder.SeedRedTeamUserAsync(dbContext, passwordHasher, redTeamEmail, redTeamPassword, seedLogger);
     }
 
     app.Run();
