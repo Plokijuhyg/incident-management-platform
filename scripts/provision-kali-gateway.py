@@ -7,7 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 KEY = Path.home()/".ssh/incident_lab"
-HOST = "kali@192.168.0.107"
+HOST = "kali@192.168.50.2"
 REMOTE = "/home/kali/.local/share/incident-platform-gateway"
 STATE = ROOT/"logs/hexstrike-private"
 
@@ -40,7 +40,7 @@ if not (r/"connection.json").exists():
  subprocess.run(["openssl","pkcs12","-export","-out","client.pfx","-inkey","client.key","-in","client.pem","-certfile","ca.pem","-passout","env:PFX_PASS"],env=env,check=True)
  Path("connection.json").write_text(json.dumps(settings))
 else:settings=json.loads(Path("connection.json").read_text())
-values={"GATEWAY_ENABLE_EXECUTION":"true","GATEWAY_BIND":"127.0.0.1","GATEWAY_PORT":"9443","GATEWAY_STORAGE":str(r/"state"),"APPROVED_TARGETS":'["192.168.0.110","192.168.0.111"]',"HEXSTRIKE_PORT":"8888","HEXSTRIKE_VERIFIED_VERSION":"6.0.0","GATEWAY_TOKEN":settings["token"],"GATEWAY_CERT":str(r/"server.pem"),"GATEWAY_KEY":str(r/"server.key"),"GATEWAY_CLIENT_CA":str(r/"ca.pem")}
+values={"GATEWAY_ENABLE_EXECUTION":"true","GATEWAY_BIND":"127.0.0.1","GATEWAY_PORT":"9443","GATEWAY_STORAGE":str(r/"state"),"APPROVED_TARGETS":'["192.168.50.10","192.168.50.11"]',"HEXSTRIKE_PORT":"8888","HEXSTRIKE_VERIFIED_VERSION":"6.0.0","GATEWAY_TOKEN":settings["token"],"GATEWAY_CERT":str(r/"server.pem"),"GATEWAY_KEY":str(r/"server.key"),"GATEWAY_CLIENT_CA":str(r/"ca.pem")}
 Path("gateway.env").write_text("\n".join(k+"="+v for k,v in values.items())+"\n")
 u=Path.home()/".config/systemd/user"
 u.mkdir(parents=True,exist_ok=True)
@@ -70,10 +70,10 @@ def main():
  secrets_path=Path(os.environ["APPDATA"])/"Microsoft/UserSecrets/edfc24f8-0481-4fa1-96fc-bfc42f8cc29d/secrets.json"
  config=json.loads(secrets_path.read_text(encoding="utf-8-sig"))
  config.update({"HexStrike:Enabled":"true","HexStrike:GatewayUrl":"https://127.0.0.1:9443","HexStrike:GatewayToken":connection["token"],"HexStrike:ClientCertificatePath":str(STATE/"client.pfx"),"HexStrike:ClientCertificatePassword":connection["password"],"HexStrike:ServerCaCertificatePath":str(STATE/"ca.pem"),
-  "HexStrike:Targets:0:Id":"metasploitable3","HexStrike:Targets:0:Name":"Metasploitable3 lab (eth2)","HexStrike:Targets:0:Ip":"192.168.0.110","HexStrike:Targets:0:Approved":"true",
-  "HexStrike:Targets:1:Id":"metasploitable3-eth","HexStrike:Targets:1:Name":"Metasploitable3 lab (eth)","HexStrike:Targets:1:Ip":"192.168.0.111","HexStrike:Targets:1:Approved":"true",
+  "HexStrike:Targets:0:Id":"metasploitable3-win","HexStrike:Targets:0:Name":"Metasploitable3 Windows (Win2k8)","HexStrike:Targets:0:Ip":"192.168.50.10","HexStrike:Targets:0:Approved":"true",
+  "HexStrike:Targets:1:Id":"metasploitable3-ubuntu","HexStrike:Targets:1:Name":"Metasploitable3 Ubuntu","HexStrike:Targets:1:Ip":"192.168.50.11","HexStrike:Targets:1:Approved":"true",
   # Ollama runs on the Kali Windows host (192.168.0.105); set it to bind 0.0.0.0 and pull the model named here.
-  "Lab:OllamaUrl":"http://192.168.0.105:11434","Ollama:Enabled":"true","Ollama:Model":"llama3.1:8b"})
+  "Lab:OllamaUrl":"http://127.0.0.1:11434","Ollama:Enabled":"true","Ollama:Model":"huihui_ai/qwen2.5-abliterate:14b"})
  secrets_path.write_text(json.dumps(config,indent=2),encoding="utf-8")
  print("Backend user secrets configured (targets .110/.111, Ollama at 192.168.0.105).")
  print("Start the 9443 tunnel to kali@192.168.0.107, ensure Ollama binds 0.0.0.0 with the model pulled, then restart the API.")
