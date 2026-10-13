@@ -62,6 +62,7 @@ try
     builder.Services.AddSingleton<OllamaAnalysis>();
     builder.Services.AddHttpClient("Ollama",client=>client.Timeout=Timeout.InfiniteTimeSpan).RemoveAllLoggers().ConfigurePrimaryHttpMessageHandler(()=>new HttpClientHandler{AllowAutoRedirect=false,UseProxy=false});
     builder.Services.AddHostedService<AssessmentWorker>();
+    builder.Services.AddSingleton<OrchestrationCancellation>();
     builder.Services.AddHostedService<OrchestrationWorker>();
     builder.Services.AddHttpClient("AssessmentGateway").ConfigurePrimaryHttpMessageHandler(() => {
         var handler=new HttpClientHandler { AllowAutoRedirect=false, UseProxy=false };

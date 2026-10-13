@@ -11,12 +11,27 @@ namespace IncidentPlatform.Api.Services;
 // task, and the platform executes ONLY the reviewed allow-listed tools against the approved
 // target (the gateway PRESET boundary still applies; exploitation tools are never exposed).
 // One run is processed at a time so the single local model is not hammered concurrently.
-public sealed class OrchestrationWorker(IServiceScopeFactory scopes,AssessmentGateway gateway,IHostEnvironment environment,ILogger<OrchestrationWorker> logger):BackgroundService
+public sealed class OrchestrationWorker(IServiceScopeFactory scopes,AssessmentGateway gateway,OrchestrationCancellation cancellation,IHostEnvironment environment,ILogger<OrchestrationWorker> logger):BackgroundService
 {
  protected override async Task ExecuteAsync(CancellationToken ct)
  {
   if(environment.IsEnvironment("Testing")||!gateway.Enabled)return;
+  await ResetOrphanedRuns(ct);
   while(!ct.IsCancellationRequested){try{await Tick(ct);}catch(OperationCanceledException)when(ct.IsCancellationRequested){break;}catch(Exception e){logger.LogError(e,"Orchestration worker paused; runs retained");}try{await Task.Delay(3000,ct);}catch(OperationCanceledException){break;}}
+ }
+
+ // A run left "Running" by a previous process has no live cancellation handle and will never be
+ // picked up again (the worker only takes Pending), so fail it once on startup rather than orphan it.
+ private async Task ResetOrphanedRuns(CancellationToken ct)
+ {
+  try
+  {
+   using var scope=scopes.CreateScope();var db=scope.ServiceProvider.GetRequiredService<AppDbContext>();
+   var stale=await db.OrchestrationRuns.Where(x=>x.Status=="Running").ToListAsync(ct);
+   foreach(var r in stale){r.Status="Failed";r.FinishedAt=DateTime.UtcNow;r.Error="Interrupted by an API restart.";}
+   if(stale.Count>0)await db.SaveChangesAsync(ct);
+  }
+  catch(Exception e){logger.LogError(e,"Could not reset orphaned orchestration runs");}
  }
 
  private async Task Tick(CancellationToken ct)
@@ -27,12 +42,13 @@ public sealed class OrchestrationWorker(IServiceScopeFactory scopes,AssessmentGa
   var run=await db.OrchestrationRuns.Where(x=>x.Status=="Pending").OrderBy(x=>x.CreatedAt).FirstOrDefaultAsync(ct);
   if(run is null)return;
   run.Status="Running";run.StartedAt=DateTime.UtcNow;run.Model=ollama.Model;await db.SaveChangesAsync(ct);
+  var runCts=cancellation.Register(run.Id,ct);var runToken=runCts.Token;
   var transcript=new JsonArray();
   try
   {
    var target=gateway.ResolveTarget(run.TargetId,run.TargetIp);
    if(target is null||target.Ip!=run.TargetIp)throw new InvalidOperationException("Target is no longer approved.");
-   var caps=await gateway.Send(HttpMethod.Get,"/v1/capabilities",null,ct);
+   var caps=await gateway.Send(HttpMethod.Get,"/v1/capabilities",null,runToken);
    if(!caps.TryGetProperty("connected",out var connected)||connected.ValueKind!=JsonValueKind.True)throw new InvalidOperationException("HexStrike gateway is not connected; no tools can be orchestrated.");
    var manifestId=caps.TryGetProperty("manifestId",out var mid)?mid.GetString():null;
    if(manifestId is null||!caps.TryGetProperty("tools",out var toolsEl)||toolsEl.ValueKind!=JsonValueKind.Array)throw new InvalidOperationException("Gateway capabilities are incomplete.");
@@ -53,7 +69,7 @@ public sealed class OrchestrationWorker(IServiceScopeFactory scopes,AssessmentGa
    var messages=new JsonArray{new JsonObject{["role"]="system",["content"]=system},new JsonObject{["role"]="user",["content"]=run.Task}};
    for(var step=1;step<=run.MaxSteps;step++)
    {
-    var (message,seconds)=await ollama.ChatWithTools(messages,toolSchemas,ct);
+    var (message,seconds)=await ollama.ChatWithTools(messages,toolSchemas,runToken);
     messages.Add(JsonNode.Parse(message.GetRawText()));
     var hasCalls=message.TryGetProperty("tool_calls",out var calls)&&calls.ValueKind==JsonValueKind.Array&&calls.GetArrayLength()>0;
     if(!hasCalls)
@@ -73,7 +89,7 @@ public sealed class OrchestrationWorker(IServiceScopeFactory scopes,AssessmentGa
      else
      {
       var sw=Stopwatch.StartNew();
-      try{output=await RunBoundedTool(category,fname,manifestId,target.Ip,run,ct);node["status"]="ok";}
+      try{output=await RunBoundedTool(category,fname,manifestId,target.Ip,run,runToken);node["status"]="ok";}
       catch(Exception e)when(e is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException or KeyNotFoundException){output="Tool execution error: "+e.Message;node["status"]="error";}
       sw.Stop();node["toolSeconds"]=Math.Round(sw.Elapsed.TotalSeconds,1);
      }
@@ -81,10 +97,17 @@ public sealed class OrchestrationWorker(IServiceScopeFactory scopes,AssessmentGa
      node["output"]=output;transcript.Add(node);
      messages.Add(new JsonObject{["role"]="tool",["content"]=output});
     }
-    run.TranscriptJson=transcript.ToJsonString();await db.SaveChangesAsync(ct);
+    run.TranscriptJson=transcript.ToJsonString();await db.SaveChangesAsync(runToken);
    }
    run.Status="Completed";run.TranscriptJson=transcript.ToJsonString();run.FinishedAt=DateTime.UtcNow;
    db.AuditLogs.Add(new(){ActorUserId=run.RequestedById,Action="ORCHESTRATION_COMPLETED",EntityType="OrchestrationRun",EntityId=run.Id,OccurredAt=DateTime.UtcNow,IpAddress="127.0.0.1",Outcome=AuditOutcome.Success});
+   await db.SaveChangesAsync(ct);
+  }
+  catch(OperationCanceledException)when(ct.IsCancellationRequested){throw;}
+  catch(OperationCanceledException)when(runCts.IsCancellationRequested)
+  {
+   run.Status="Cancelled";run.FinishedAt=DateTime.UtcNow;run.Error="Stopped by the operator.";run.TranscriptJson=transcript.ToJsonString();
+   db.AuditLogs.Add(new(){ActorUserId=run.RequestedById,Action="ORCHESTRATION_CANCELLED",EntityType="OrchestrationRun",EntityId=run.Id,OccurredAt=DateTime.UtcNow,IpAddress="127.0.0.1",Outcome=AuditOutcome.Denied});
    await db.SaveChangesAsync(ct);
   }
   catch(Exception e)when(e is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException or KeyNotFoundException)
@@ -93,6 +116,7 @@ public sealed class OrchestrationWorker(IServiceScopeFactory scopes,AssessmentGa
    db.AuditLogs.Add(new(){ActorUserId=run.RequestedById,Action="ORCHESTRATION_FAILED",EntityType="OrchestrationRun",EntityId=run.Id,OccurredAt=DateTime.UtcNow,IpAddress="127.0.0.1",Outcome=AuditOutcome.Failure});
    await db.SaveChangesAsync(ct);
   }
+  finally{cancellation.Unregister(run.Id);}
  }
 
  // Execute one reviewed tool through the SAME bounded gateway path as a normal scan: resolve a

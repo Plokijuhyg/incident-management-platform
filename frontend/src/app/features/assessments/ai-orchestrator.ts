@@ -82,6 +82,9 @@ interface Run {
             <span class="status-pill" [class.status-ok]="r.status === 'Completed'" [class.status-error]="r.status === 'Failed'" [class.status-active]="r.status === 'Running' || r.status === 'Pending'">{{ r.status }}</span>
             <code>{{ r.targetIp }}</code> &middot; model <code>{{ r.model || '—' }}</code>
           </p>
+          @if (r.status === 'Running' || r.status === 'Pending') {
+            <button class="button secondary small" (click)="stop(r.id)" [disabled]="stopping()">{{ stopping() ? 'Stopping…' : 'Stop run' }}</button>
+          }
           @if (r.error) { <p class="field-error">{{ r.error }}</p> }
           @for (step of r.transcript || []; track $index) {
             @if (step.kind === 'tool') {
@@ -114,7 +117,9 @@ interface Run {
                   <td>{{ r.targetIp }}</td>
                   <td class="break-word">{{ r.task }}</td>
                   <td><span class="status-pill" [class.status-ok]="r.status === 'Completed'" [class.status-error]="r.status === 'Failed'" [class.status-active]="r.status === 'Running' || r.status === 'Pending'">{{ r.status }}</span></td>
-                  <td><button class="link-button" (click)="open(r.id)">View</button></td>
+                  <td><button class="link-button" (click)="open(r.id)">View</button>
+                    @if (r.status === 'Running' || r.status === 'Pending') { <button class="link-button" (click)="stop(r.id)">Stop</button> }
+                  </td>
                 </tr>
               }
             </tbody>
@@ -131,6 +136,7 @@ export class AiOrchestrator {
   protected active = signal<Run | null>(null);
   protected errors = signal<string[]>([]);
   protected busy = signal(false);
+  protected stopping = signal(false);
   protected targetIp = '';
   protected task = '';
   protected maxSteps = 6;
@@ -179,5 +185,15 @@ export class AiOrchestrator {
       maxSteps: this.maxSteps, webPort: this.webPort, webHttps: this.webHttps, webPath: '/',
     }).pipe(takeUntilDestroyed(this.destroy), finalize(() => this.busy.set(false)))
       .subscribe({ next: (r) => { this.active.set(r); this.list(); }, error: (e) => this.errors.set(apiErrors(e)) });
+  }
+  protected stop(id: string) {
+    if (this.stopping()) return;
+    this.stopping.set(true);
+    this.http.post('/api/assessments/orchestrations/' + id + '/cancel', {}).pipe(
+      takeUntilDestroyed(this.destroy), finalize(() => this.stopping.set(false)),
+    ).subscribe({
+      next: () => { this.list(); const a = this.active(); if (a && a.id === id) this.open(id, true); },
+      error: (e) => this.errors.set(apiErrors(e)),
+    });
   }
 }

@@ -14,7 +14,7 @@ public record CreateOrchestrationRequest(string Task,string? TargetId=null,strin
 // which bounded, reviewed tools to run against the approved target (OrchestrationWorker executes
 // them through the same PRESET-bounded gateway). No exploitation path is exposed here.
 [ApiController,Authorize(Roles=$"{RoleNames.Admin},{RoleNames.SecurityManager},{RoleNames.RedTeam}"),Route("api/assessments/orchestrations")]
-public sealed class OrchestrationController(AppDbContext db,AssessmentGateway gateway,ICurrentUser currentUser):ControllerBase
+public sealed class OrchestrationController(AppDbContext db,AssessmentGateway gateway,OrchestrationCancellation cancellation,ICurrentUser currentUser):ControllerBase
 {
  [HttpGet]
  public async Task<IActionResult> List(CancellationToken ct)=>Ok(await db.OrchestrationRuns.AsNoTracking().OrderByDescending(x=>x.CreatedAt).Take(50)
@@ -45,6 +45,21 @@ public sealed class OrchestrationController(AppDbContext db,AssessmentGateway ga
   db.AuditLogs.Add(new(){ActorUserId=currentUser.Id,Action="ORCHESTRATION_REQUESTED",EntityType="OrchestrationRun",EntityId=run.Id,OccurredAt=DateTime.UtcNow,IpAddress=HttpContext.Connection.RemoteIpAddress?.ToString()??"",Outcome=AuditOutcome.Success});
   await db.SaveChangesAsync(ct);
   return AcceptedAtAction(nameof(Get),new{id=run.Id},Map(run));
+ }
+
+ // Stop a Pending or Running orchestration. A live run is cancelled via the in-process registry so
+ // the current model call / tool poll aborts promptly; a Pending or orphaned run is marked directly.
+ [HttpPost("{id:guid}/cancel")]
+ public async Task<IActionResult> Cancel(string id,CancellationToken ct)
+ {
+  var run=await db.OrchestrationRuns.SingleOrDefaultAsync(x=>x.Id==id,ct);
+  if(run is null)return NotFound();
+  if(run.Status is "Completed" or "Failed" or "Cancelled")return NoContent();
+  if(run.Status=="Pending"){run.Status="Cancelled";run.FinishedAt=DateTime.UtcNow;run.Error="Cancelled before it started.";}
+  else if(!cancellation.TryCancel(id)){run.Status="Cancelled";run.FinishedAt=DateTime.UtcNow;run.Error="Stopped by the operator.";}
+  db.AuditLogs.Add(new(){ActorUserId=currentUser.Id,Action="ORCHESTRATION_CANCELLED",EntityType="OrchestrationRun",EntityId=run.Id,OccurredAt=DateTime.UtcNow,IpAddress=HttpContext.Connection.RemoteIpAddress?.ToString()??"",Outcome=AuditOutcome.Denied});
+  await db.SaveChangesAsync(ct);
+  return NoContent();
  }
 
  private static object Map(OrchestrationRun r)=>new{r.Id,r.Task,r.TargetName,r.TargetIp,r.MaxSteps,r.Status,r.Model,r.Summary,r.Error,r.CreatedAt,r.StartedAt,r.FinishedAt,
