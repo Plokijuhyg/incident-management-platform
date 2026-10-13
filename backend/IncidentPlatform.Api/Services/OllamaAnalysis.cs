@@ -1,7 +1,9 @@
+using System.Diagnostics;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using IncidentPlatform.Api.Models;
 namespace IncidentPlatform.Api.Services;
 
@@ -16,9 +18,29 @@ public sealed class OllamaAnalysis(IConfiguration config,IHttpClientFactory clie
  public const string PromptVersion=DefensivePromptVersion;
  public static string VersionFor(string mode)=>mode=="offensive"?OffensivePromptVersion:DefensivePromptVersion;
  private readonly SemaphoreSlim gate=new(1,1);
+ // Local-model inference time budget (seconds). CPU-only hosts need far longer for large models (e.g. a 14B),
+ // so it is configurable via Lab:OllamaTimeoutSeconds and clamped to a sane range. Default preserves 180s.
+ private int TimeoutSeconds=>Math.Clamp(config.GetValue<int?>("Lab:OllamaTimeoutSeconds")??180,30,1800);
  public string Model=>config["Ollama:Model"]??"";
  public bool Configured=>config.GetValue<bool>("Ollama:Enabled") && Endpoint() is not null && !string.IsNullOrWhiteSpace(Model) && Model.Length<=100 && !Model.Contains("cloud",StringComparison.OrdinalIgnoreCase);
  private Uri? Endpoint(){if(!Uri.TryCreate(config["Lab:OllamaUrl"],UriKind.Absolute,out var uri)||uri.Scheme is not("http" or "https")||uri.UserInfo!=""||uri.AbsolutePath!="/"||uri.Query!=""||uri.Fragment!=""||!IPAddress.TryParse(uri.Host,out var ip)||!(IPAddress.IsLoopback(ip)||AssessmentGateway.PrivateIp(uri.Host)))return null;return uri;}
+ // Tool-calling chat for the AI orchestrator. Sends the conversation plus the available tool
+ // schemas to the local model and returns its reply (which may contain tool_calls) and the
+ // wall-clock seconds it took. Same loopback/private gating, temperature 0, configurable timeout.
+ public async Task<(JsonElement Message,double Seconds)> ChatWithTools(JsonArray messages,JsonArray tools,CancellationToken ct)
+ {
+  if(!Configured)throw new InvalidOperationException("Ollama is not configured (Ollama:Enabled, Ollama:Model, private Lab:OllamaUrl).");
+  var endpoint=Endpoint()!;
+  using var timeout=CancellationTokenSource.CreateLinkedTokenSource(ct);timeout.CancelAfter(TimeSpan.FromSeconds(TimeoutSeconds));
+  var body=new JsonObject{["model"]=Model,["messages"]=messages.DeepClone(),["tools"]=tools.DeepClone(),["stream"]=false,["options"]=new JsonObject{["temperature"]=0,["num_ctx"]=8192}};
+  using var request=new HttpRequestMessage(HttpMethod.Post,new Uri(endpoint,"api/chat")){Content=new StringContent(body.ToJsonString(),Encoding.UTF8,"application/json")};
+  var sw=Stopwatch.StartNew();
+  using var response=await clients.CreateClient("Ollama").SendAsync(request,HttpCompletionOption.ResponseHeadersRead,timeout.Token);
+  response.EnsureSuccessStatusCode();await response.Content.LoadIntoBufferAsync(4*1024*1024,timeout.Token);
+  using var doc=JsonDocument.Parse(await response.Content.ReadAsStringAsync(timeout.Token));sw.Stop();
+  if(!doc.RootElement.TryGetProperty("message",out var message))throw new JsonException("Ollama response had no message.");
+  return (message.Clone(),Math.Round(sw.Elapsed.TotalSeconds,1));
+ }
  public static AnalysisInput Prepare(SecurityAssessment row)
  {
   if(row.ObservationsJson is null || row.ObservationsJson.Length>4*1024*1024)throw new InvalidOperationException("Normalized evidence is missing or too large.");
@@ -44,9 +66,10 @@ public sealed class OllamaAnalysis(IConfiguration config,IHttpClientFactory clie
   AssessmentAnalysis Result(string status,string? text=null,string? error=null,bool cut=false)=>new(status,model,row.EvidenceSha256!,input.Sha256,VersionFor(mode),DateTime.UtcNow,text,error,input.Included,input.Total,input.Truncated,cut,offensive?"offensive":"defensive");
   if(!Configured)return Result("Unavailable",error:"Configure Ollama:Enabled, Ollama:Model and the private Lab:OllamaUrl on the API host.");
   if(!await gate.WaitAsync(0,ct))return Result("Busy",error:"Another analysis is running. Retry after it finishes.");
+  var timeoutSeconds=TimeoutSeconds;
   try
   {
-   using var timeout=CancellationTokenSource.CreateLinkedTokenSource(ct);timeout.CancelAfter(TimeSpan.FromSeconds(180));
+   using var timeout=CancellationTokenSource.CreateLinkedTokenSource(ct);timeout.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
    var client=clients.CreateClient("Ollama");var endpoint=Endpoint()!;
    using(var tags=await client.GetAsync(new Uri(endpoint,"api/tags"),HttpCompletionOption.ResponseHeadersRead,timeout.Token))
    {
@@ -85,7 +108,7 @@ public sealed class OllamaAnalysis(IConfiguration config,IHttpClientFactory clie
    catch(JsonException){}
    return Result("Completed","Unstructured model output \u2014 the model did not return the requested sections, so its raw response is shown for manual review:\n\n"+text,cut:cut);
   }
-  catch(OperationCanceledException) when(!ct.IsCancellationRequested){return Result("TimedOut",error:"Ollama did not finish within three minutes. Scanner results are unchanged; retry when the model is ready.");}
+  catch(OperationCanceledException) when(!ct.IsCancellationRequested){return Result("TimedOut",error:$"Ollama did not finish within {timeoutSeconds} seconds. Scanner results are unchanged; retry when the model is ready.");}
   catch(Exception ex) when(ex is HttpRequestException or JsonException or InvalidOperationException or NotSupportedException){return Result("Unavailable",error:"Ollama is unavailable or returned an invalid response. Check the connection and model, then retry.");}
   finally{gate.Release();}
  }

@@ -17,6 +17,7 @@ public partial class AppDbContext : DbContext
     public DbSet<AutomationRule> AutomationRules => Set<AutomationRule>();
     public DbSet<AutomationDecision> AutomationDecisions => Set<AutomationDecision>();
     public DbSet<SecurityAssessment> SecurityAssessments => Set<SecurityAssessment>();
+    public DbSet<OrchestrationRun> OrchestrationRuns => Set<OrchestrationRun>();
     public DbSet<WindowsEvent> WindowsEvents => Set<WindowsEvent>();
     public DbSet<WindowsEventCheckpoint> WindowsEventCheckpoints => Set<WindowsEventCheckpoint>();
     public DbSet<LogEvent> LogEvents => Set<LogEvent>();
@@ -49,6 +50,7 @@ public partial class AppDbContext : DbContext
         modelBuilder.ApplyConfiguration(new AutomationRuleConfiguration());
         modelBuilder.ApplyConfiguration(new AutomationDecisionConfiguration());
         modelBuilder.ApplyConfiguration(new SecurityAssessmentConfiguration());
+        modelBuilder.ApplyConfiguration(new OrchestrationRunConfiguration());
         modelBuilder.ApplyConfiguration(new WindowsEventConfiguration());
         modelBuilder.ApplyConfiguration(new WindowsEventCheckpointConfiguration());
         modelBuilder.ApplyConfiguration(new LogEventConfiguration());

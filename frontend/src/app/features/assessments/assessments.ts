@@ -4,6 +4,7 @@ import { AssessmentAnalysisPanel } from './assessment-analysis';
 import { InfoPopup } from '../../shared/components/detail-modal';
 import { DetailModal } from '../../shared/components/detail-modal';
 import { ToolCatalog } from './tool-catalog';
+import { AiOrchestrator } from './ai-orchestrator';
 import { toolStateView, TOOL_STATE_STYLES } from './tool-state';
 import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
@@ -42,7 +43,7 @@ interface Assessment {
   analysisJson?: string | null;
 }
 @Component({
-  imports: [AssessmentAnalysisPanel,InfoPopup,DetailModal,FormsModule, ErrorNotice, ToolCatalog],
+  imports: [AssessmentAnalysisPanel,InfoPopup,DetailModal,FormsModule, ErrorNotice, ToolCatalog, AiOrchestrator],
   styleUrl: './assessments.css',
   styles: [TOOL_STATE_STYLES],
   template: `
@@ -58,6 +59,7 @@ interface Assessment {
     </div>
     <app-error-notice [messages]="errors()" />
     <app-tool-catalog />
+    <app-ai-orchestrator />
     <form class="assessment-builder" (ngSubmit)="start()">
       <div class="builder-main">
         <section class="panel setup-section">
