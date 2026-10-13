@@ -7,8 +7,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 KEY = Path.home()/".ssh/incident_lab"
-HOST = "kali@192.168.50.2"
-REMOTE = "/home/kali/.local/share/incident-platform-gateway"
+HOST = "zein@192.168.50.2"
+REMOTE = "/home/zein/.local/share/incident-platform-gateway"
 STATE = ROOT/"logs/hexstrike-private"
 
 def run(args, **kwargs):
@@ -72,9 +72,9 @@ def main():
  config.update({"HexStrike:Enabled":"true","HexStrike:GatewayUrl":"https://127.0.0.1:9443","HexStrike:GatewayToken":connection["token"],"HexStrike:ClientCertificatePath":str(STATE/"client.pfx"),"HexStrike:ClientCertificatePassword":connection["password"],"HexStrike:ServerCaCertificatePath":str(STATE/"ca.pem"),
   "HexStrike:Targets:0:Id":"metasploitable3-win","HexStrike:Targets:0:Name":"Metasploitable3 Windows (Win2k8)","HexStrike:Targets:0:Ip":"192.168.50.10","HexStrike:Targets:0:Approved":"true",
   "HexStrike:Targets:1:Id":"metasploitable3-ubuntu","HexStrike:Targets:1:Name":"Metasploitable3 Ubuntu","HexStrike:Targets:1:Ip":"192.168.50.11","HexStrike:Targets:1:Approved":"true",
-  # Ollama runs on the Kali Windows host (192.168.0.105); set it to bind 0.0.0.0 and pull the model named here.
+  # Ollama runs on the Kali laptop itself; reached over the loopback SSH tunnel, so the URL stays 127.0.0.1.
   "Lab:OllamaUrl":"http://127.0.0.1:11434","Ollama:Enabled":"true","Ollama:Model":"huihui_ai/qwen2.5-abliterate:14b"})
  secrets_path.write_text(json.dumps(config,indent=2),encoding="utf-8")
- print("Backend user secrets configured (targets .110/.111, Ollama at 192.168.0.105).")
- print("Start the 9443 tunnel to kali@192.168.0.107, ensure Ollama binds 0.0.0.0 with the model pulled, then restart the API.")
+ print("Backend user secrets configured (targets 192.168.50.10/.11, Ollama over the loopback tunnel).")
+ print("Start the 9443/8888/11434 tunnel to zein@192.168.50.2, ensure Ollama is running with the model pulled, then restart the API.")
 if __name__=="__main__":main()
