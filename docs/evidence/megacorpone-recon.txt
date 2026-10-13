@@ -1,0 +1,98 @@
+================ megacorpone.com reconnaissance ================
+date (UTC): Tue Oct 13 10:03:52 PM UTC 2026
+operator host: zein-worker
+
+================ 1. WHOIS ================
+   Updated Date: 2025-12-22T21:08:41Z
+   Creation Date: 2013-01-22T23:01:00Z
+   Registry Expiry Date: 2027-01-22T23:01:00Z
+   Registrar: Gandi SAS
+   Name Server: NS1.MEGACORPONE.COM
+   Name Server: NS2.MEGACORPONE.COM
+   Name Server: NS3.MEGACORPONE.COM
+   DNSSEC: unsigned
+date of the domain name registrant's agreement with the sponsoring
+Updated Date: 2026-09-22T15:22:02Z
+Creation Date: 2013-01-22T22:01:00Z
+Registrar: GANDI SAS
+Registry Registrant ID: 
+Registrant Name: Alan Grofield
+Registrant Organization: MegaCorpOne
+Registrant Street: 2 Old Mill St
+Registrant City: Rachel
+Registrant State/Province: Nevada
+Registrant Postal Code: 89001
+Registrant Country: US
+Registrant Phone: +1.9038836342
+Registrant Phone Ext:
+Registrant Fax: 
+Registrant Fax Ext:
+Registrant Email: 3310f82fb4a8f79ee9a6bfe8d672d87e-1696395@contact.gandi.net
+Admin Organization: MegaCorpOne
+Admin Country: US
+Tech Organization: MegaCorpOne
+Tech Country: US
+Name Server: NS1.MEGACORPONE.COM
+
+================ 2. DNS records ================
+--- SOA ---
+megacorpone.com has SOA record ns1.megacorpone.com. admin.megacorpone.com. 202508051 28800 7200 2419200 300
+--- NS ---
+megacorpone.com name server ns3.megacorpone.com.
+megacorpone.com name server ns2.megacorpone.com.
+megacorpone.com name server ns1.megacorpone.com.
+--- MX ---
+megacorpone.com mail is handled by 20 spool.mail.gandi.net.
+megacorpone.com mail is handled by 10 fb.mail.gandi.net.
+megacorpone.com mail is handled by 50 mail.megacorpone.com.
+megacorpone.com mail is handled by 60 mail2.megacorpone.com.
+--- A ---
+megacorpone.com has address 149.56.244.87
+--- TXT ---
+megacorpone.com descriptive text "Try Harder"
+megacorpone.com descriptive text "google-site-verification=U7B_b0HNeBtY4qYGQZNsEYXfCJ32hMNV3GtC0wWq5pA"
+
+================ 3. Name servers ================
+ns3.megacorpone.com
+ns2.megacorpone.com
+ns1.megacorpone.com
+
+================ 4. DNS zone transfer (AXFR) ================
+--- AXFR @ ns3.megacorpone.com ---
+;  
+--- AXFR @ ns2.megacorpone.com ---
+;  
+--- AXFR @ ns1.megacorpone.com ---
+;  
+
+================ 5. theHarvester (OSINT: emails/hosts) ================
+
+================ DONE ================
+================ AXFR (full output, confirm refused/allowed) ================
+--- dig AXFR megacorpone.com @ns1.megacorpone.com ---
+; Transfer failed.
+--- dig AXFR megacorpone.com @ns2.megacorpone.com ---
+; Transfer failed.
+--- dig AXFR megacorpone.com @ns3.megacorpone.com ---
+; Transfer failed.
+
+================ Subdomain enumeration (DNS brute, common names) ================
+www.megacorpone.com            149.56.244.87
+www2.megacorpone.com           149.56.244.87
+admin.megacorpone.com          167.114.21.64
+beta.megacorpone.com           167.114.21.65
+intranet.megacorpone.com       167.114.21.67
+mail.megacorpone.com           167.114.21.68
+mail2.megacorpone.com          167.114.21.69
+ns1.megacorpone.com            51.79.37.18
+ns2.megacorpone.com            51.222.39.63
+ns3.megacorpone.com            66.70.207.180
+router.megacorpone.com         167.114.21.70
+vpn.megacorpone.com            167.114.21.76
+fs1.megacorpone.com            167.114.21.66
+support.megacorpone.com        167.114.21.74
+siem.megacorpone.com           167.114.21.71
+snmp.megacorpone.com           167.114.21.72
+syslog.megacorpone.com         167.114.21.73
+test.megacorpone.com           167.114.21.75
+================ DONE ================
