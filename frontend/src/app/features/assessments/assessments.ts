@@ -14,6 +14,7 @@ import { finalize, forkJoin, timer } from 'rxjs';
 import { ErrorNotice } from '../../shared/components/error-notice';
 import { apiErrors } from '../../core/services/api-errors';
 import { parseObservations, filterObservations, severities } from './assessment-results';
+import { formatToolOutput } from './output-format';
 import { utcTimestamp } from '../../core/services/incidents';
 interface Target {
   id: string;
@@ -196,7 +197,7 @@ interface Assessment {
         @if (r.error) {
           <p class="notice">{{ r.error }}</p>
         }
-        @if (r.requestJson) { <app-info-popup title="Requested categories and tools"><span popupTrigger>Requested categories and tools</span><pre class="raw-output">{{ r.requestJson }}</pre></app-info-popup> }
+        @if (r.requestJson) { <app-info-popup title="Requested categories and tools"><span popupTrigger>Requested categories and tools</span><pre class="raw-output">{{ formatOutput(r.requestJson) }}</pre></app-info-popup> }
         <h3>Findings and service observations</h3>
         <p class="muted">Severity is supplied by the check or template, not inferred from an open port. Nikto observations require severity triage.</p>
         @if (coverage(r); as c) {
@@ -204,7 +205,7 @@ interface Assessment {
         }
         @for (step of steps(r); track $index) {
           <p><strong>{{ step['tool'] }}</strong> {{ step['endpoint'] }} &middot; {{ step['status'] }} {{ step['reason'] }} {{ step['error'] }}</p><p class="muted">{{ step['interpretation'] }}</p>
-          @if (step['evidence']) { <app-info-popup title="{{ step['tool'] }} output"><span popupTrigger>{{ step['tool'] }} output</span><pre class="raw-output">{{ step['evidence'] }}</pre></app-info-popup> }
+          @if (step['evidence']) { <app-info-popup title="{{ step['tool'] }} output"><span popupTrigger>{{ step['tool'] }} output</span><pre class="raw-output">{{ formatOutput(step['evidence']) }}</pre></app-info-popup> }
         }
         <p aria-live="polite"><strong>{{ findingCount(r) }}</strong> scanner findings &middot;
           <strong>{{ observations(r).length - findingCount(r) }}</strong> service observations.
@@ -238,7 +239,7 @@ interface Assessment {
                     <td>{{ o['title'] || o['service'] }}</td>
                     <td>{{ o['product'] }} {{ o['version'] }} {{ o['cve'] }}
                       @if (o['kind'] === 'Finding') {
-                        <app-info-popup title="Review evidence"><span popupTrigger>Review evidence</span><p>{{ o['confidence'] }}</p><p>{{ o['severityBasis'] }}</p><pre class="raw-output">{{ o['evidence'] }}</pre></app-info-popup>
+                        <app-info-popup title="Review evidence"><span popupTrigger>Review evidence</span><p>{{ o['confidence'] }}</p><p>{{ o['severityBasis'] }}</p><pre class="raw-output">{{ formatOutput(o['evidence']) }}</pre></app-info-popup>
                       }
                     </td>
                     <td><span class="badge" [class.danger]="o['severity'] === 'High' || o['severity'] === 'Critical'">{{ o['severity'] }}</span></td>
@@ -254,7 +255,7 @@ interface Assessment {
         }
         @if (r.rawResponse) {
           <app-info-popup title="Original gateway response and tool evidence"><span popupTrigger>Original gateway response and tool evidence</span>
-            <pre class="raw-output">{{ r.rawResponse }}</pre>
+            <pre class="raw-output">{{ formatOutput(r.rawResponse) }}</pre>
           </app-info-popup>
           <p class="muted small-text break-word">Stored response SHA-256: {{ r.evidenceSha256 }}</p>
         } @else {
@@ -353,6 +354,8 @@ export class AssessmentsPage {
   protected coverage(r: Assessment): string {
     try { return JSON.parse(r.rawResponse || '{}').coverage || ''; } catch { return ''; }
   }
+  // Readable raw tool/gateway output — shared with the AI orchestrator (presentation only).
+  protected formatOutput = formatToolOutput;
   protected discover() {
     if (this.discovering()) return;
     this.discovering.set(true);

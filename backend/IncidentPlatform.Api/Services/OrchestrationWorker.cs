@@ -93,9 +93,10 @@ public sealed class OrchestrationWorker(IServiceScopeFactory scopes,AssessmentGa
       catch(Exception e)when(e is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException or KeyNotFoundException){output="Tool execution error: "+e.Message;node["status"]="error";}
       sw.Stop();node["toolSeconds"]=Math.Round(sw.Elapsed.TotalSeconds,1);
      }
-     if(output.Length>2500)output=output[..2500];
-     node["output"]=output;transcript.Add(node);
-     messages.Add(new JsonObject{["role"]="tool",["content"]=output});
+     // Feed the model a short view (keeps its context/latency down); keep a larger copy for display.
+     var modelView=output.Length>2500?output[..2500]:output;
+     node["output"]=output.Length>12000?output[..12000]:output;transcript.Add(node);
+     messages.Add(new JsonObject{["role"]="tool",["content"]=modelView});
     }
     run.TranscriptJson=transcript.ToJsonString();await db.SaveChangesAsync(runToken);
    }

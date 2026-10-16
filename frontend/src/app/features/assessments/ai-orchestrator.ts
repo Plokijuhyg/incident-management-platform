@@ -7,6 +7,7 @@ import { ErrorNotice } from '../../shared/components/error-notice';
 import { InfoPopup } from '../../shared/components/detail-modal';
 import { apiErrors } from '../../core/services/api-errors';
 import { utcTimestamp } from '../../core/services/incidents';
+import { formatToolOutput } from './output-format';
 
 interface Step {
   step: number;
@@ -94,7 +95,7 @@ interface Run {
                 @if (step.toolSeconds != null) { <small class="muted">ran {{ step.toolSeconds }}s</small> }
               </p>
               @if (step.output) {
-                <app-info-popup title="Tool output"><span popupTrigger>Tool output</span><pre class="raw-output">{{ step.output }}</pre></app-info-popup>
+                <app-info-popup title="Tool output"><span popupTrigger>Tool output</span><pre class="raw-output">{{ formatOutput(step.output) }}</pre></app-info-popup>
               }
             } @else {
               <p><strong>Final summary</strong> &middot; produced in {{ step.modelSeconds }}s</p>
@@ -137,6 +138,7 @@ export class AiOrchestrator {
   protected errors = signal<string[]>([]);
   protected busy = signal(false);
   protected stopping = signal(false);
+  protected formatOutput = formatToolOutput;
   protected targetIp = '';
   protected task = '';
   protected maxSteps = 6;
