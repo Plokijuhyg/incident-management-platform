@@ -17,11 +17,11 @@ export class AssessmentAnalysisTasks {
   let owner=this.auth.user()?.id;
   effect(()=>{const current=this.auth.user()?.id;if(current!==owner){this.subscription?.unsubscribe();this.task.set(null);owner=current;}});
  }
- start(id:string,label:string,mode:'defensive'|'offensive'='defensive'){
+ start(id:string,label:string,mode:'defensive'|'offensive'='defensive',model?:string){
   if(this.task()?.busy)return;
   this.task.set({id,label,busy:true,report:null,errors:[]});
   // This subscription belongs to the session, never to the evidence popup.
-  this.subscription=this.http.post<Analysis>('/api/assessments/'+id+'/analysis',{mode}).subscribe({
+  this.subscription=this.http.post<Analysis>('/api/assessments/'+id+'/analysis',{mode,model}).subscribe({
    next:report=>this.task.set({id,label,busy:false,report,errors:[]}),
    error:error=>this.task.set({id,label,busy:false,report:null,errors:apiErrors(error)})
   });

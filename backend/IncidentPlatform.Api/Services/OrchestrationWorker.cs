@@ -41,7 +41,7 @@ public sealed class OrchestrationWorker(IServiceScopeFactory scopes,AssessmentGa
   var ollama=scope.ServiceProvider.GetRequiredService<OllamaAnalysis>();
   var run=await db.OrchestrationRuns.Where(x=>x.Status=="Pending").OrderBy(x=>x.CreatedAt).FirstOrDefaultAsync(ct);
   if(run is null)return;
-  run.Status="Running";run.StartedAt=DateTime.UtcNow;run.Model=ollama.Model;await db.SaveChangesAsync(ct);
+  run.Status="Running";run.StartedAt=DateTime.UtcNow;if(string.IsNullOrWhiteSpace(run.Model))run.Model=ollama.Model;await db.SaveChangesAsync(ct);
   var runCts=cancellation.Register(run.Id,ct);var runToken=runCts.Token;
   var transcript=new JsonArray();
   try
@@ -69,7 +69,7 @@ public sealed class OrchestrationWorker(IServiceScopeFactory scopes,AssessmentGa
    var messages=new JsonArray{new JsonObject{["role"]="system",["content"]=system},new JsonObject{["role"]="user",["content"]=run.Task}};
    for(var step=1;step<=run.MaxSteps;step++)
    {
-    var (message,seconds)=await ollama.ChatWithTools(messages,toolSchemas,runToken);
+    var (message,seconds)=await ollama.ChatWithTools(messages,toolSchemas,runToken,run.Model);
     messages.Add(JsonNode.Parse(message.GetRawText()));
     var hasCalls=message.TryGetProperty("tool_calls",out var calls)&&calls.ValueKind==JsonValueKind.Array&&calls.GetArrayLength()>0;
     if(!hasCalls)

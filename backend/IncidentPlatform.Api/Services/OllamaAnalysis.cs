@@ -23,16 +23,32 @@ public sealed class OllamaAnalysis(IConfiguration config,IHttpClientFactory clie
  private int TimeoutSeconds=>Math.Clamp(config.GetValue<int?>("Lab:OllamaTimeoutSeconds")??180,30,1800);
  public string Model=>config["Ollama:Model"]??"";
  public bool Configured=>config.GetValue<bool>("Ollama:Enabled") && Endpoint() is not null && !string.IsNullOrWhiteSpace(Model) && Model.Length<=100 && !Model.Contains("cloud",StringComparison.OrdinalIgnoreCase);
+ // A caller-chosen model is honoured only when it is a plausible local model name; otherwise the
+ // configured default is used. Whether it is actually installed is checked against /api/tags at run time.
+ public string EffectiveModel(string? requested)=>!string.IsNullOrWhiteSpace(requested)&&requested!.Length<=100&&!requested.Contains("cloud",StringComparison.OrdinalIgnoreCase)?requested:Model;
+ // The locally installed Ollama models, so the operator can pick between them (e.g. compare the 14B with
+ // a smaller, faster model). Loopback/private endpoint only; cloud models are excluded.
+ public async Task<string[]> InstalledModels(CancellationToken ct)
+ {
+  var endpoint=Endpoint();if(endpoint is null)return [];
+  using var timeout=CancellationTokenSource.CreateLinkedTokenSource(ct);timeout.CancelAfter(TimeSpan.FromSeconds(10));
+  using var response=await clients.CreateClient("Ollama").GetAsync(new Uri(endpoint,"api/tags"),HttpCompletionOption.ResponseHeadersRead,timeout.Token);
+  response.EnsureSuccessStatusCode();await response.Content.LoadIntoBufferAsync(262144,timeout.Token);
+  using var doc=JsonDocument.Parse(await response.Content.ReadAsStringAsync(timeout.Token));
+  if(!doc.RootElement.TryGetProperty("models",out var models)||models.ValueKind!=JsonValueKind.Array)return [];
+  return models.EnumerateArray().Select(m=>m.TryGetProperty("name",out var n)?n.GetString():null).Where(n=>!string.IsNullOrWhiteSpace(n)&&!n!.Contains("cloud",StringComparison.OrdinalIgnoreCase)).Select(n=>n!).Distinct().ToArray();
+ }
  private Uri? Endpoint(){if(!Uri.TryCreate(config["Lab:OllamaUrl"],UriKind.Absolute,out var uri)||uri.Scheme is not("http" or "https")||uri.UserInfo!=""||uri.AbsolutePath!="/"||uri.Query!=""||uri.Fragment!=""||!IPAddress.TryParse(uri.Host,out var ip)||!(IPAddress.IsLoopback(ip)||AssessmentGateway.PrivateIp(uri.Host)))return null;return uri;}
  // Tool-calling chat for the AI orchestrator. Sends the conversation plus the available tool
  // schemas to the local model and returns its reply (which may contain tool_calls) and the
  // wall-clock seconds it took. Same loopback/private gating, temperature 0, configurable timeout.
- public async Task<(JsonElement Message,double Seconds)> ChatWithTools(JsonArray messages,JsonArray tools,CancellationToken ct)
+ public async Task<(JsonElement Message,double Seconds)> ChatWithTools(JsonArray messages,JsonArray tools,CancellationToken ct,string? modelOverride=null)
  {
   if(!Configured)throw new InvalidOperationException("Ollama is not configured (Ollama:Enabled, Ollama:Model, private Lab:OllamaUrl).");
   var endpoint=Endpoint()!;
+  var model=EffectiveModel(modelOverride);
   using var timeout=CancellationTokenSource.CreateLinkedTokenSource(ct);timeout.CancelAfter(TimeSpan.FromSeconds(TimeoutSeconds));
-  var body=new JsonObject{["model"]=Model,["messages"]=messages.DeepClone(),["tools"]=tools.DeepClone(),["stream"]=false,["options"]=new JsonObject{["temperature"]=0,["num_ctx"]=8192}};
+  var body=new JsonObject{["model"]=model,["messages"]=messages.DeepClone(),["tools"]=tools.DeepClone(),["stream"]=false,["options"]=new JsonObject{["temperature"]=0,["num_ctx"]=8192}};
   using var request=new HttpRequestMessage(HttpMethod.Post,new Uri(endpoint,"api/chat")){Content=new StringContent(body.ToJsonString(),Encoding.UTF8,"application/json")};
   var sw=Stopwatch.StartNew();
   using var response=await clients.CreateClient("Ollama").SendAsync(request,HttpCompletionOption.ResponseHeadersRead,timeout.Token);
@@ -59,9 +75,9 @@ public sealed class OllamaAnalysis(IConfiguration config,IHttpClientFactory clie
   var json=JsonSerializer.Serialize(new{assessmentStatus=row.Status,totalObservations=total,includedObservations=observations.Count,inputTruncated=truncated,observations});
   return new(json,Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json))),observations.Count,total,truncated);
  }
- public async Task<AssessmentAnalysis> Analyze(SecurityAssessment row,AnalysisInput input,CancellationToken ct,string mode="defensive")
+ public async Task<AssessmentAnalysis> Analyze(SecurityAssessment row,AnalysisInput input,CancellationToken ct,string mode="defensive",string? modelOverride=null)
  {
-  var model=Model;
+  var model=EffectiveModel(modelOverride);
   var offensive=mode=="offensive";
   AssessmentAnalysis Result(string status,string? text=null,string? error=null,bool cut=false)=>new(status,model,row.EvidenceSha256!,input.Sha256,VersionFor(mode),DateTime.UtcNow,text,error,input.Included,input.Total,input.Truncated,cut,offensive?"offensive":"defensive");
   if(!Configured)return Result("Unavailable",error:"Configure Ollama:Enabled, Ollama:Model and the private Lab:OllamaUrl on the API host.");

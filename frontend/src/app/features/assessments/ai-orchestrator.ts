@@ -66,6 +66,9 @@ interface Run {
         placeholder="e.g. Scan and enumerate this host, then report the most likely exploitable vulnerability."></textarea>
 
       <div class="endpoint-fields">
+        @if (models().length) {
+          <div><label for="orch-model">Model</label><select id="orch-model" name="orchModel" [(ngModel)]="model">@for (m of models(); track m) { <option [value]="m">{{ m }}</option> }</select></div>
+        }
         <div><label for="orch-steps">Max steps</label><input id="orch-steps" type="number" name="orchSteps" [(ngModel)]="maxSteps" min="1" max="10" /></div>
         <div><label for="orch-port">Web port</label><input id="orch-port" type="number" name="orchPort" [(ngModel)]="webPort" min="1" max="65535" /></div>
         <label class="inline-check"><input type="checkbox" name="orchHttps" [(ngModel)]="webHttps" /> Use HTTPS</label>
@@ -138,9 +141,11 @@ export class AiOrchestrator {
   protected errors = signal<string[]>([]);
   protected busy = signal(false);
   protected stopping = signal(false);
+  protected models = signal<string[]>([]);
   protected formatOutput = formatToolOutput;
   protected targetIp = '';
   protected task = '';
+  protected model = '';
   protected maxSteps = 6;
   protected webPort = 80;
   protected webHttps = false;
@@ -148,6 +153,10 @@ export class AiOrchestrator {
 
   constructor() {
     this.list();
+    this.http
+      .get<{ models: string[]; defaultModel: string }>('/api/assessments/analysis/models')
+      .pipe(takeUntilDestroyed())
+      .subscribe({ next: (r) => { this.models.set(r.models || []); if (!this.model) this.model = r.defaultModel || ''; }, error: () => {} });
     timer(0, 5000).pipe(takeUntilDestroyed()).subscribe(() => {
       if (document.hidden) return;
       this.list();
@@ -183,7 +192,7 @@ export class AiOrchestrator {
     this.busy.set(true);
     this.errors.set([]);
     this.http.post<Run>('/api/assessments/orchestrations', {
-      task: this.task.trim(), targetIp: this.targetIp.trim(),
+      task: this.task.trim(), targetIp: this.targetIp.trim(), model: this.model || undefined,
       maxSteps: this.maxSteps, webPort: this.webPort, webHttps: this.webHttps, webPath: '/',
     }).pipe(takeUntilDestroyed(this.destroy), finalize(() => this.busy.set(false)))
       .subscribe({ next: (r) => { this.active.set(r); this.list(); }, error: (e) => this.errors.set(apiErrors(e)) });
