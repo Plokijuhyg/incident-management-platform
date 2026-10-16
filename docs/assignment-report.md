@@ -311,6 +311,53 @@ here, and what the governed platform enforces structurally. `[Expand in your own
 
 ---
 
+## 10. Additional Contribution — a Governed Orchestration Platform (beyond the base requirement)
+
+> This section describes work built *around* the assignment, not required by it. It is included because
+> the assessment criteria explicitly reward traceability, operational security, documentation quality and
+> the ability to propose usage safeguards — all of which this platform operationalises. It is clearly an
+> extra contribution and does not replace any Part A–D deliverable.
+
+To use HexStrike safely and auditably, the orchestrator was wrapped in an incident-management platform
+(ASP.NET Core API + Angular SPA) that mediates every call to HexStrike through a bounded,
+mutually-authenticated (mTLS) gateway. All execution routes through the same **reviewed tool allow-list**
+(generic command execution and exploitation are never reachable), under **role-based access control**
+(a dedicated `RED_TEAM` role scoped only to the Assessments module), **per-target approval**
+(private/RFC1918 addresses only), and a **full audit trail**.
+
+Within this, the Assessments module offers **two complementary ways to run an assessment** — the same
+safe tool-set, two points on the human-oversight spectrum:
+
+**Option 1 — Operator-selected scan, then LLM explanation (human-driven).**
+The operator picks a category and the exact tools to run; HexStrike executes them with bounded parameters;
+the normalised results are shown in a readable form (for example nmap rendered as a port/service table,
+and tool stdout/stderr cleaned of terminal control codes). The local LLM then produces an
+evidence-grounded **explanation** — a defensive SOC brief or an educational exploitation walkthrough — so
+the operator does not just see the raw output but understands it. *The human selects; the AI explains.*
+
+**Option 2 — AI Orchestrator (AI-driven).**
+The operator writes a natural-language task; the local LLM **decides which of the bounded tools to run**,
+executes them through the same gateway, and returns a step-by-step transcript plus a final summary. A
+**Stop** control cancels a run at any time. *The AI selects and runs; the human triggers and supervises.*
+
+Together these illustrate the oversight range the assignment asks about — from fully operator-selected
+with AI explanation, to AI-selected with operator supervision — **never fully autonomous, and never able
+to exploit**. Completed-assessment findings are additionally auto-promoted into the platform's SOC alert
+queue (as a `PenTest` source), bridging red-team output into a blue-team incident workflow.
+
+**Mapping to the assessment criteria.**
+- *Traceability:* every request, model decision and tool execution is audited and attributable to a user.
+- *Operational security / safeguards:* reviewed allow-list, mTLS gateway, RBAC, private-targets-only,
+  exploitation excluded by design, local-only (loopback) model endpoint.
+- *Human oversight:* operator-triggered, with a Stop control; actual exploitation stays manual and outside
+  the platform.
+- *Documentation:* the platform, its two modes and its limits are documented alongside this report.
+
+`[SCREENSHOT: E1 — the AI Orchestrator panel]`  ·  `[SCREENSHOT: E2 — an operator-selected scan with the
+readable tool output / LLM explanation]`
+
+---
+
 ## Technical Appendix
 
 - **Screenshots.** `[A: HexStrike install & /health]` · `[B: ollama list + LOCAL MODEL READY]`
