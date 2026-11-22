@@ -65,27 +65,32 @@ public sealed class OrchestrationWorker(IServiceScopeFactory scopes,AssessmentGa
     toolSchemas.Add(new JsonObject{["type"]="function",["function"]=function});
    }
    if(toolSchemas.Count==0)throw new InvalidOperationException("No bounded recon/scan tools are available to orchestrate.");
-   var system="You are an authorized security-assessment orchestrator in an isolated lab. You are given a task and ONE fixed, approved target. You SELECT which tools to run by calling them; the platform runs each selected tool against the approved target with safe, bounded parameters that you do not control. Only reconnaissance, scanning and vulnerability-detection tools are available - there is NO exploitation capability. Work step by step: call ONE tool, read its result, then decide the next step. Do not repeat a tool that already returned a result. When you have enough to answer the task, reply with a concise final summary (open services, likely vulnerabilities) and stop calling tools. Target: "+target.Ip+".";
+   var system="You are an authorized security-assessment orchestrator in an isolated lab. You are given a task and ONE fixed, approved target. You SELECT which tools to run by calling them; the platform runs each selected tool against the approved target with safe, bounded parameters that you do not control. Only reconnaissance, scanning and vulnerability-detection tools are available - there is NO exploitation capability. Use ONLY the tools provided to you; never invent a tool name or call a tool that is not in the provided list. CRITICAL: always act through the function-calling interface. On each turn you MUST do exactly one of two things: (a) call EXACTLY ONE tool via the interface, or (b) ONLY when you already have tool results and are finished, reply with a final summary and no tool call. Never write a tool call, its JSON, or a multi-step plan as plain text - if you describe calls in text instead of invoking them, no tool runs. Do not plan several tools at once; call one, wait for its result, then decide the next. Do not repeat a tool that already returned a result. The final summary should list open services and likely vulnerabilities. Target: "+target.Ip+".";
    var messages=new JsonArray{new JsonObject{["role"]="system",["content"]=system},new JsonObject{["role"]="user",["content"]=run.Task}};
    for(var step=1;step<=run.MaxSteps;step++)
    {
     var (message,seconds)=await ollama.ChatWithTools(messages,toolSchemas,runToken,run.Model);
     messages.Add(JsonNode.Parse(message.GetRawText()));
-    var hasCalls=message.TryGetProperty("tool_calls",out var calls)&&calls.ValueKind==JsonValueKind.Array&&calls.GetArrayLength()>0;
-    if(!hasCalls)
+    var invocations=new List<(string Name,string Args)>();
+    if(message.TryGetProperty("tool_calls",out var calls)&&calls.ValueKind==JsonValueKind.Array&&calls.GetArrayLength()>0)
+     foreach(var call in calls.EnumerateArray())
+      invocations.Add((call.TryGetProperty("function",out var fn)&&fn.TryGetProperty("name",out var nm)?nm.GetString()??"":"",call.TryGetProperty("function",out var fn2)&&fn2.TryGetProperty("arguments",out var ar)?ar.GetRawText():"{}"));
+    // Some models write the tool call as plain text (e.g. <tool_call>{...}</tool_call>) instead of using
+    // the tool_calls field; salvage it so the run continues rather than ending on a leaked call.
+    else if(ParseLeakedToolCall(message.TryGetProperty("content",out var lc)?lc.GetString():null) is {} leaked)
+     invocations.Add(leaked);
+    if(invocations.Count==0)
     {
      var final=message.TryGetProperty("content",out var content)?content.GetString():"";
      transcript.Add(new JsonObject{["step"]=step,["kind"]="final",["modelSeconds"]=seconds,["text"]=final});
      run.Summary=final;break;
     }
-    foreach(var call in calls.EnumerateArray())
+    foreach(var (fname,fargs) in invocations)
     {
-     var fname=call.TryGetProperty("function",out var fn)&&fn.TryGetProperty("name",out var nm)?nm.GetString()??"":"";
-     var fargs=call.TryGetProperty("function",out var fn2)&&fn2.TryGetProperty("arguments",out var ar)?ar.GetRawText():"{}";
      var node=new JsonObject{["step"]=step,["kind"]="tool",["modelSeconds"]=seconds,["tool"]=fname,["args"]=fargs};
      string output;
      if(!categories.TryGetValue(fname,out var category))
-     {output="This tool is not permitted in the bounded orchestrator.";node["status"]="rejected";}
+     {output="Tool '"+fname+"' is not available in this orchestrator. Call one of the provided tools only ("+string.Join(", ",categories.Keys)+").";node["status"]="rejected";}
      else
      {
       var sw=Stopwatch.StartNew();
@@ -118,6 +123,27 @@ public sealed class OrchestrationWorker(IServiceScopeFactory scopes,AssessmentGa
    await db.SaveChangesAsync(ct);
   }
   finally{cancellation.Unregister(run.Id);}
+ }
+
+ // Extract a tool call a model wrote as text (inside <tool_call> tags, or a bare {name,arguments}
+ // object) so the orchestrator can still run it instead of treating the text as a final answer.
+ private static (string Name,string Args)? ParseLeakedToolCall(string? content)
+ {
+  if(string.IsNullOrWhiteSpace(content))return null;
+  var text=content;
+  var open=text.IndexOf("<tool_call>",StringComparison.OrdinalIgnoreCase);
+  if(open>=0){var close=text.IndexOf("</tool_call>",open,StringComparison.OrdinalIgnoreCase);text=close>open?text[(open+11)..close]:text[(open+11)..];}
+  var start=text.IndexOf('{');var end=text.LastIndexOf('}');
+  if(start<0||end<=start)return null;
+  try
+  {
+   using var doc=JsonDocument.Parse(text[start..(end+1)]);
+   var root=doc.RootElement;
+   if(root.ValueKind!=JsonValueKind.Object||!root.TryGetProperty("name",out var n)||n.ValueKind!=JsonValueKind.String)return null;
+   var args=root.TryGetProperty("arguments",out var a)?a.GetRawText():root.TryGetProperty("parameters",out var p)?p.GetRawText():"{}";
+   return (n.GetString()!,args);
+  }
+  catch(JsonException){return null;}
  }
 
  // Execute one reviewed tool through the SAME bounded gateway path as a normal scan: resolve a
