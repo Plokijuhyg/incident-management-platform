@@ -46,3 +46,6 @@ integrations/hexstrike/state/
 # Local Sigma importer environment
 integrations/sigma/.venv/
 integrations/sigma/.venv312/
+
+# Word/Office temporary lock files
+~$*

